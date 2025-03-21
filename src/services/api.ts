@@ -495,3 +495,115 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
   
   return true;
 };
+
+// Fetch appointments by client phone number
+export const fetchAppointmentsByPhone = async (phoneNumber: string): Promise<any[]> => {
+  console.log(`Fetching appointments for phone number: ${phoneNumber}...`);
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        professionals:professional_id (name),
+        services:service_id (name, duration, price),
+        slots:slot_id (start_time, end_time)
+      `)
+      .eq('client_phone', phoneNumber)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching appointments by phone:', error);
+      throw error;
+    }
+    
+    console.log(`Retrieved ${data?.length || 0} appointments for phone number`);
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error fetching appointments by phone:', err);
+    throw err;
+  }
+};
+
+// New function to create available slots in bulk
+export const createAvailableSlotsBulk = async (
+  professionalId: string,
+  startDate: Date,
+  endDate: Date,
+  selectedDays: number[],
+  timeRanges: Array<{startHour: string, startMinute: string, endHour: string, endMinute: string}>
+): Promise<{ success: boolean, count: number, error?: any }> => {
+  console.log(`Creating bulk slots for professional ${professionalId}...`);
+  try {
+    const slots = [];
+    const currentDate = new Date(startDate);
+    
+    // Loop through each day in the date range
+    while (currentDate <= endDate) {
+      // Check if the current day of week is in the selected days
+      // Sunday is 0, Monday is 1, etc.
+      const dayOfWeek = currentDate.getDay();
+      
+      if (selectedDays.includes(dayOfWeek)) {
+        // For each selected time range
+        for (const timeRange of timeRanges) {
+          const slotStartTime = new Date(currentDate);
+          slotStartTime.setHours(
+            parseInt(timeRange.startHour),
+            parseInt(timeRange.startMinute),
+            0, 0
+          );
+          
+          const slotEndTime = new Date(currentDate);
+          slotEndTime.setHours(
+            parseInt(timeRange.endHour),
+            parseInt(timeRange.endMinute),
+            0, 0
+          );
+          
+          // Only add valid time ranges
+          if (slotEndTime > slotStartTime) {
+            slots.push({
+              professional_id: professionalId,
+              start_time: slotStartTime.toISOString(),
+              end_time: slotEndTime.toISOString(),
+              is_available: true
+            });
+          }
+        }
+      }
+      
+      // Move to the next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    console.log(`Generated ${slots.length} slots for bulk insertion`);
+    
+    if (slots.length === 0) {
+      return { success: true, count: 0 };
+    }
+    
+    // Insert slots in batches to avoid exceeding request size limits
+    const BATCH_SIZE = 50;
+    let insertedCount = 0;
+    
+    for (let i = 0; i < slots.length; i += BATCH_SIZE) {
+      const batch = slots.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase
+        .from('available_slots')
+        .insert(batch);
+      
+      if (error) {
+        console.error('Error creating bulk available slots:', error);
+        return { success: false, count: insertedCount, error };
+      }
+      
+      insertedCount += batch.length;
+    }
+    
+    console.log(`Successfully inserted ${insertedCount} slots`);
+    return { success: true, count: insertedCount };
+  } catch (err) {
+    console.error('Unexpected error creating bulk available slots:', err);
+    return { success: false, count: 0, error: err };
+  }
+};

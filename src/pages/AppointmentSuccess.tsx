@@ -34,9 +34,6 @@ const AppointmentSuccess = () => {
           
           {/* Success Message */}
           <h1 className="text-3xl font-bold mb-4">Agendamento Confirmado!</h1>
-          <p className="text-lg text-muted-foreground mb-8">
-            Seu horário foi reservado com sucesso. Enviamos um e-mail de confirmação com todos os detalhes.
-          </p>
           
           {/* Appointment Details Card */}
           <div className="bg-card border rounded-lg p-6 mb-8 animate-slide-up">

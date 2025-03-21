@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 interface ClientInfoFormProps {
   clientName: string;
@@ -16,6 +17,22 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
   onClientNameChange,
   onClientPhoneChange
 }) => {
+  const handleNameChange = (value: string) => {
+    if (value.length > 50) {
+      toast.warning("O nome não pode ter mais de 50 caracteres");
+      return;
+    }
+    onClientNameChange(value);
+  };
+
+  const handlePhoneChange = (value: string) => {
+    if (value.length > 15) {
+      toast.warning("O telefone não pode ter mais de 15 caracteres");
+      return;
+    }
+    onClientPhoneChange(value);
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       <h2 className="text-2xl font-bold mb-4">Seus dados</h2>
@@ -26,9 +43,13 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
           id="client-name"
           placeholder="Digite seu nome completo"
           value={clientName}
-          onChange={(e) => onClientNameChange(e.target.value)}
+          onChange={(e) => handleNameChange(e.target.value)}
+          maxLength={50}
           required
         />
+        <p className="text-xs text-muted-foreground text-right">
+          {clientName.length}/50 caracteres
+        </p>
       </div>
       
       <div className="space-y-2">
@@ -38,9 +59,13 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
           placeholder="(00) 00000-0000"
           type="tel"
           value={clientPhone}
-          onChange={(e) => onClientPhoneChange(e.target.value)}
+          onChange={(e) => handlePhoneChange(e.target.value)}
+          maxLength={15}
           required
         />
+        <p className="text-xs text-muted-foreground text-right">
+          {clientPhone.length}/15 caracteres
+        </p>
       </div>
     </div>
   );
