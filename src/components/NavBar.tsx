@@ -1,67 +1,95 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarDays, Clock, User, Menu } from 'lucide-react';
-import Logo from './Logo';
+import { Link, useLocation } from 'react-router-dom';
+import { CalendarDays, Menu, X, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import Logo from '@/components/Logo';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const NavBar = () => {
-  const navLinks = [
-    { name: 'Calendário', href: '/calendar', icon: <CalendarDays className="h-4 w-4 mr-2" /> },
-    { name: 'Agendamentos', href: '/appointments', icon: <Clock className="h-4 w-4 mr-2" /> },
-    { name: 'Perfil', href: '/profile', icon: <User className="h-4 w-4 mr-2" /> },
+  const location = useLocation();
+  
+  const links = [
+    { href: '/', label: 'Início' },
+    { href: '/booking', label: 'Agendar' },
+    { href: '/appointments', label: 'Meus Agendamentos' },
   ];
-
+  
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link to="/" className="transition-opacity hover:opacity-80">
+        <div className="flex items-center gap-2">
           <Logo />
-        </Link>
+          <span className="text-xl font-bold">Agenda</span>
+        </div>
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
-          {navLinks.map((link) => (
+          {links.map((link) => (
             <Link
-              key={link.name}
+              key={link.href}
               to={link.href}
-              className="flex items-center text-sm font-medium text-muted-foreground transition-colors hover:text-primary subtle-underline"
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                location.pathname === link.href ? 'text-foreground' : 'text-muted-foreground'
+              }`}
             >
-              {link.icon}
-              {link.name}
+              {link.label}
             </Link>
           ))}
-          <Button size="sm">Agendar</Button>
         </nav>
         
-        {/* Mobile Navigation */}
-        <Sheet>
-          <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <div className="flex flex-col gap-4 mt-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.name}
-                  to={link.href}
-                  className="flex items-center py-2 text-base font-medium transition-colors hover:text-primary"
-                >
-                  {link.icon}
-                  {link.name}
+        <div className="flex items-center gap-4">
+          <Button asChild variant="outline" size="sm" className="hidden md:flex">
+            <Link to="/booking">
+              <CalendarDays className="mr-2 h-4 w-4" />
+              Agendar
+            </Link>
+          </Button>
+          
+          <Button asChild variant="ghost" size="sm" className="hidden md:flex">
+            <Link to="/login">
+              <LogIn className="mr-2 h-4 w-4" />
+              Área Restrita
+            </Link>
+          </Button>
+          
+          {/* Mobile Menu */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="pr-0">
+              <div className="px-7">
+                <Link to="/" className="flex items-center gap-2 mb-8">
+                  <Logo />
+                  <span className="text-xl font-bold">Agenda</span>
                 </Link>
-              ))}
-              <Button className="mt-4 w-full">Agendar</Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+                
+                <nav className="flex flex-col gap-4">
+                  {links.map((link) => (
+                    <Link
+                      key={link.href}
+                      to={link.href}
+                      className="flex font-medium transition-colors hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                  
+                  <Link
+                    to="/login"
+                    className="flex font-medium transition-colors hover:text-foreground"
+                  >
+                    Área Restrita
+                  </Link>
+                </nav>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );

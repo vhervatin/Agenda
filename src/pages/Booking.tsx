@@ -2,94 +2,83 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import NavBar from '@/components/NavBar';
 import StepIndicator from '@/components/StepIndicator';
 import ServiceItem from '@/components/ServiceItem';
+import ProfessionalItem from '@/components/ProfessionalItem';
 import DatePicker from '@/components/DatePicker';
-import TimeSlots, { TimeSlot } from '@/components/TimeSlots';
+import TimeSlots from '@/components/TimeSlots';
+import ClientInfoForm from '@/components/ClientInfoForm';
 import AppointmentSummary from '@/components/AppointmentSummary';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { 
+  fetchProfessionals, 
+  fetchProfessionalServices, 
+  fetchAvailableSlots,
+  createAppointment 
+} from '@/services/api';
+import { Professional, Service, TimeSlot } from '@/types/types';
 
-const STEPS = ["Serviço", "Data", "Horário", "Confirmação"];
-
-// Mock data for services
-const services = [
-  {
-    id: "service-1",
-    name: "Corte de Cabelo",
-    duration: "45 min",
-    price: "R$ 80,00",
-    description: "Corte personalizado de acordo com seu estilo e preferência."
-  },
-  {
-    id: "service-2",
-    name: "Barba",
-    duration: "30 min",
-    price: "R$ 50,00",
-    description: "Modelagem e acabamento de barba com toalha quente."
-  },
-  {
-    id: "service-3",
-    name: "Pacote Completo",
-    duration: "75 min",
-    price: "R$ 120,00",
-    description: "Corte de cabelo + barba com desconto especial."
-  },
-  {
-    id: "service-4",
-    name: "Hidratação",
-    duration: "50 min",
-    price: "R$ 70,00",
-    description: "Tratamento profundo para cabelos danificados ou ressecados."
-  }
-];
-
-// Generate mock time slots for a given date
-const generateTimeSlots = (date: Date): TimeSlot[] => {
-  // This would come from a back-end API in a real application
-  const slots = [];
-  
-  // Generate slots from 8:00 to 18:00 every 30 minutes
-  for (let hour = 8; hour < 18; hour++) {
-    for (let minute of [0, 30]) {
-      // Generate some random availability
-      const available = Math.random() > 0.3;
-      
-      slots.push({
-        id: `slot-${hour}-${minute}`,
-        time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-        available: available
-      });
-    }
-  }
-  
-  return slots;
-};
+const STEPS = ["Profissional", "Serviço", "Data", "Horário", "Dados", "Confirmação"];
 
 const Booking = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
+  const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Generate time slots when date changes
-  useEffect(() => {
-    if (selectedDate) {
-      setTimeSlots(generateTimeSlots(selectedDate));
-      setSelectedTimeSlot(null); // Reset selected time slot when date changes
-    }
-  }, [selectedDate]);
+  // Fetch professionals
+  const { 
+    data: professionals = [], 
+    isLoading: isLoadingProfessionals,
+    error: professionalsError
+  } = useQuery({
+    queryKey: ['professionals'],
+    queryFn: fetchProfessionals
+  });
   
-  // Find the selected service object
+  // Fetch services for selected professional
+  const { 
+    data: services = [], 
+    isLoading: isLoadingServices,
+  } = useQuery({
+    queryKey: ['services', selectedProfessional],
+    queryFn: () => selectedProfessional ? fetchProfessionalServices(selectedProfessional) : Promise.resolve([]),
+    enabled: !!selectedProfessional
+  });
+  
+  // Fetch available slots when date changes
+  useEffect(() => {
+    if (selectedProfessional && selectedDate) {
+      fetchAvailableSlots(selectedProfessional, selectedDate)
+        .then(slots => {
+          setTimeSlots(slots);
+          setSelectedTimeSlot(null); // Reset selected time slot when date changes
+        })
+        .catch(error => {
+          console.error("Error fetching time slots:", error);
+          toast.error("Não foi possível carregar os horários disponíveis");
+        });
+    }
+  }, [selectedProfessional, selectedDate]);
+  
+  // Find the selected professional, service and time slot objects
+  const selectedProfessionalObject = selectedProfessional 
+    ? professionals.find(prof => prof.id === selectedProfessional) || null
+    : null;
+    
   const selectedServiceObject = selectedService 
     ? services.find(service => service.id === selectedService) || null
     : null;
   
-  // Find the selected time slot object
   const selectedTimeObject = selectedTimeSlot
     ? timeSlots.find(slot => slot.id === selectedTimeSlot)
     : null;
@@ -97,34 +86,86 @@ const Booking = () => {
   const handleNextStep = () => {
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
+      window.scrollTo(0, 0);
     }
   };
   
   const handlePrevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      window.scrollTo(0, 0);
     }
   };
   
   const handleConfirmAppointment = () => {
+    if (!selectedProfessional || !selectedService || !selectedTimeSlot || !clientName || !clientPhone) {
+      toast.error("Por favor, preencha todos os campos");
+      return;
+    }
+    
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      toast.success("Agendamento confirmado com sucesso!");
-      navigate("/appointment-success");
-    }, 1500);
+    createAppointment(
+      selectedProfessional,
+      selectedService,
+      selectedTimeSlot,
+      clientName,
+      clientPhone
+    )
+      .then(result => {
+        setIsSubmitting(false);
+        if (result.success) {
+          toast.success("Agendamento confirmado com sucesso!");
+          navigate("/appointment-success", { 
+            state: { 
+              professionalName: selectedProfessionalObject?.name,
+              serviceName: selectedServiceObject?.name,
+              date: selectedDate,
+              time: selectedTimeObject?.time,
+              appointmentId: result.appointmentId
+            } 
+          });
+        } else {
+          toast.error("Não foi possível confirmar seu agendamento. Por favor, tente novamente.");
+        }
+      })
+      .catch(() => {
+        setIsSubmitting(false);
+        toast.error("Ocorreu um erro ao processar seu agendamento. Por favor, tente novamente.");
+      });
   };
   
   // Check if current step is valid
   const isCurrentStepValid = () => {
     switch (currentStep) {
-      case 0: return !!selectedService;
-      case 1: return !!selectedDate;
-      case 2: return !!selectedTimeSlot;
+      case 0: return !!selectedProfessional;
+      case 1: return !!selectedService;
+      case 2: return !!selectedDate;
+      case 3: return !!selectedTimeSlot;
+      case 4: return !!clientName && !!clientPhone;
       default: return true;
     }
+  };
+  
+  // Format duration for display
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (remainingMinutes === 0) {
+      return `${hours}h`;
+    }
+    
+    return `${hours}h ${remainingMinutes}min`;
+  };
+  
+  // Format price for display
+  const formatPrice = (price: number) => {
+    return `R$ ${price.toFixed(2).replace('.', ',')}`;
   };
   
   // Render content based on current step
@@ -133,24 +174,63 @@ const Booking = () => {
       case 0:
         return (
           <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold mb-4">Escolha um serviço</h2>
-            <div className="grid md:grid-cols-2 gap-4">
-              {services.map((service) => (
-                <ServiceItem
-                  key={service.id}
-                  id={service.id}
-                  name={service.name}
-                  duration={service.duration}
-                  price={service.price}
-                  description={service.description}
-                  selected={service.id === selectedService}
-                  onSelect={setSelectedService}
-                />
-              ))}
-            </div>
+            <h2 className="text-2xl font-bold mb-4">Escolha um profissional</h2>
+            
+            {isLoadingProfessionals ? (
+              <div className="text-center py-8">Carregando profissionais...</div>
+            ) : professionalsError ? (
+              <div className="text-center py-8 text-destructive">
+                Erro ao carregar profissionais. Por favor, tente novamente.
+              </div>
+            ) : professionals.length === 0 ? (
+              <div className="text-center py-8">Nenhum profissional disponível no momento.</div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {professionals.map((professional) => (
+                  <ProfessionalItem
+                    key={professional.id}
+                    id={professional.id}
+                    name={professional.name}
+                    photoUrl={professional.photo_url}
+                    bio={professional.bio}
+                    selected={professional.id === selectedProfessional}
+                    onSelect={setSelectedProfessional}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         );
       case 1:
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <h2 className="text-2xl font-bold mb-4">Escolha um serviço</h2>
+            
+            {isLoadingServices ? (
+              <div className="text-center py-8">Carregando serviços...</div>
+            ) : services.length === 0 ? (
+              <div className="text-center py-8">
+                Nenhum serviço disponível para este profissional.
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {services.map((service) => (
+                  <ServiceItem
+                    key={service.id}
+                    id={service.id}
+                    name={service.name}
+                    duration={formatDuration(service.duration)}
+                    price={formatPrice(service.price)}
+                    description={service.description}
+                    selected={service.id === selectedService}
+                    onSelect={setSelectedService}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 2:
         return (
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha uma data</h2>
@@ -162,7 +242,7 @@ const Booking = () => {
             </div>
           </div>
         );
-      case 2:
+      case 3:
         return (
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha um horário</h2>
@@ -173,13 +253,29 @@ const Booking = () => {
             />
           </div>
         );
-      case 3:
+      case 4:
+        return (
+          <ClientInfoForm
+            clientName={clientName}
+            clientPhone={clientPhone}
+            onClientNameChange={setClientName}
+            onClientPhoneChange={setClientPhone}
+          />
+        );
+      case 5:
         return (
           <div className="max-w-md mx-auto">
             <AppointmentSummary
-              service={selectedServiceObject}
+              service={{
+                name: selectedServiceObject?.name || '',
+                duration: selectedServiceObject ? formatDuration(selectedServiceObject.duration) : '',
+                price: selectedServiceObject ? formatPrice(selectedServiceObject.price) : '',
+              }}
               date={selectedDate}
               time={selectedTimeObject?.time || null}
+              professionalName={selectedProfessionalObject?.name || ''}
+              clientName={clientName}
+              clientPhone={clientPhone}
               onConfirm={handleConfirmAppointment}
               onEdit={() => setCurrentStep(0)}
               isSubmitting={isSubmitting}

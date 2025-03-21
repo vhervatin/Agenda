@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CalendarDays, Clock, Scissors, User } from 'lucide-react';
+import { CalendarDays, Clock, Scissors, User, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -12,6 +12,9 @@ interface AppointmentSummaryProps {
   } | null;
   date: Date | null;
   time: string | null;
+  professionalName?: string;
+  clientName?: string;
+  clientPhone?: string;
   onConfirm: () => void;
   onEdit: () => void;
   isSubmitting?: boolean;
@@ -21,6 +24,9 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
   service,
   date,
   time,
+  professionalName,
+  clientName,
+  clientPhone,
   onConfirm,
   onEdit,
   isSubmitting = false
@@ -34,7 +40,7 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
     }).format(date);
   };
 
-  const allDetailsProvided = service && date && time;
+  const allDetailsProvided = service && date && time && professionalName;
 
   return (
     <Card className="w-full animate-scale-in">
@@ -77,9 +83,22 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Prestador</p>
-            <p className="font-medium">Profissional Disponível</p>
+            <p className="font-medium">{professionalName || "Nenhum profissional selecionado"}</p>
           </div>
         </div>
+
+        {(clientName || clientPhone) && (
+          <div className="flex items-start space-x-3">
+            <div className="rounded-full p-2 bg-primary/10">
+              <Phone className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Seus dados</p>
+              <p className="font-medium">{clientName}</p>
+              {clientPhone && <p className="text-sm text-muted-foreground mt-1">{clientPhone}</p>}
+            </div>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <Button 

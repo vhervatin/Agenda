@@ -9,6 +9,8 @@ import Booking from "./pages/Booking";
 import AppointmentSuccess from "./pages/AppointmentSuccess";
 import Appointments from "./pages/Appointments";
 import Profile from "./pages/Profile";
+import Login from "./pages/auth/Login";
+import Dashboard from "./pages/admin/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +27,13 @@ const App = () => (
           <Route path="/appointment-success" element={<AppointmentSuccess />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/profile" element={<Profile />} />
+          
+          {/* Auth Routes */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin/dashboard" element={<Dashboard />} />
+          
           {/* Calendar route will redirect to appointments for now */}
           <Route path="/calendar" element={<Appointments />} />
           <Route path="*" element={<NotFound />} />
