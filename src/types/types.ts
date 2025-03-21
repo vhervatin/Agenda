@@ -4,6 +4,9 @@ export interface Professional {
   name: string;
   photo_url?: string;
   bio?: string;
+  phone?: string;
+  active?: boolean;
+  user_id?: string;
 }
 
 export interface Service {
@@ -12,6 +15,7 @@ export interface Service {
   description: string;
   duration: number;
   price: number;
+  active?: boolean;
 }
 
 export interface TimeSlot {
@@ -30,4 +34,18 @@ export interface Appointment {
   client_name: string;
   client_phone: string;
   status: 'confirmed' | 'cancelled' | 'completed';
+  created_at?: string;
+}
+
+export interface ProfessionalService {
+  id: string;
+  professional_id: string;
+  service_id: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'professional';
 }

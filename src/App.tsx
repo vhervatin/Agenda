@@ -11,6 +11,10 @@ import Appointments from "./pages/Appointments";
 import Profile from "./pages/Profile";
 import Login from "./pages/auth/Login";
 import Dashboard from "./pages/admin/Dashboard";
+import AdminProfessionals from "./pages/admin/Professionals";
+import AdminServices from "./pages/admin/Services";
+import AdminSchedule from "./pages/admin/Schedule";
+import AdminAppointments from "./pages/admin/Appointments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +37,10 @@ const App = () => (
           
           {/* Admin Routes */}
           <Route path="/admin/dashboard" element={<Dashboard />} />
+          <Route path="/admin/professionals" element={<AdminProfessionals />} />
+          <Route path="/admin/services" element={<AdminServices />} />
+          <Route path="/admin/schedule" element={<AdminSchedule />} />
+          <Route path="/admin/appointments" element={<AdminAppointments />} />
           
           {/* Calendar route will redirect to appointments for now */}
           <Route path="/calendar" element={<Appointments />} />
