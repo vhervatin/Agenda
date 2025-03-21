@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -35,7 +34,6 @@ const Booking = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Fetch professionals
   const { 
     data: professionals = [], 
     isLoading: isLoadingProfessionals,
@@ -45,7 +43,6 @@ const Booking = () => {
     queryFn: fetchProfessionals
   });
   
-  // Fetch services for selected professional
   const { 
     data: services = [], 
     isLoading: isLoadingServices,
@@ -55,13 +52,12 @@ const Booking = () => {
     enabled: !!selectedProfessional
   });
   
-  // Fetch available slots when date changes
   useEffect(() => {
     if (selectedProfessional && selectedDate) {
       fetchAvailableSlots(selectedProfessional, selectedDate)
         .then(slots => {
           setTimeSlots(slots);
-          setSelectedTimeSlot(null); // Reset selected time slot when date changes
+          setSelectedTimeSlot(null);
         })
         .catch(error => {
           console.error("Error fetching time slots:", error);
@@ -70,7 +66,6 @@ const Booking = () => {
     }
   }, [selectedProfessional, selectedDate]);
   
-  // Find the selected professional, service and time slot objects
   const selectedProfessionalObject = selectedProfessional 
     ? professionals.find(prof => prof.id === selectedProfessional) || null
     : null;
@@ -135,7 +130,6 @@ const Booking = () => {
       });
   };
   
-  // Check if current step is valid
   const isCurrentStepValid = () => {
     switch (currentStep) {
       case 0: return !!selectedProfessional;
@@ -147,7 +141,6 @@ const Booking = () => {
     }
   };
   
-  // Format duration for display
   const formatDuration = (minutes: number) => {
     if (minutes < 60) {
       return `${minutes} min`;
@@ -163,12 +156,10 @@ const Booking = () => {
     return `${hours}h ${remainingMinutes}min`;
   };
   
-  // Format price for display
   const formatPrice = (price: number) => {
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
   };
   
-  // Render content based on current step
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:

@@ -3,6 +3,7 @@ import { Professional, Service, TimeSlot } from "@/types/types";
 
 // Fetch all active professionals
 export const fetchProfessionals = async (): Promise<Professional[]> => {
+  console.log("Fetching professionals...");
   const { data, error } = await supabase
     .from('professionals')
     .select('*')
@@ -13,6 +14,7 @@ export const fetchProfessionals = async (): Promise<Professional[]> => {
     throw error;
   }
   
+  console.log("Professionals data:", data);
   return data || [];
 };
 
@@ -130,9 +132,18 @@ export const createAppointment = async (
 
 // Create a new professional
 export const createProfessional = async (professional: Omit<Professional, 'id'>): Promise<{ success: boolean; id?: string; error?: any }> => {
+  console.log("Creating professional:", professional);
+  
   const { data, error } = await supabase
     .from('professionals')
-    .insert([professional])
+    .insert([{
+      name: professional.name,
+      phone: professional.phone || null,
+      bio: professional.bio || null,
+      photo_url: professional.photo_url || null,
+      active: professional.active !== undefined ? professional.active : true,
+      user_id: professional.user_id || null
+    }])
     .select();
   
   if (error) {
@@ -140,6 +151,7 @@ export const createProfessional = async (professional: Omit<Professional, 'id'>)
     return { success: false, error };
   }
   
+  console.log("Professional created:", data);
   return {
     success: true,
     id: data?.[0]?.id
