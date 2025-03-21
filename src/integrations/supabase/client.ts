@@ -24,6 +24,9 @@ export const supabase = createClient<Database>(
         'X-Client-Info': 'supabase-js-web/2.49.1',
       },
     },
+    db: {
+      schema: 'public',
+    },
   }
 );
 
@@ -45,3 +48,15 @@ export const testConnection = async () => {
     return { success: false, error: err };
   }
 };
+
+// Helper function to check if an error is related to RLS
+export const isRLSError = (error: any) => {
+  if (!error) return false;
+  
+  const errorMessage = error.message || '';
+  return errorMessage.includes('violates row-level security') || 
+         errorMessage.includes('infinite recursion detected');
+};
+
+// Log client details to help with debugging
+console.log("Supabase client initialized with URL:", SUPABASE_URL);

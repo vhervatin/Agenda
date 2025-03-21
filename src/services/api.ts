@@ -1,5 +1,21 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isRLSError } from "@/integrations/supabase/client";
 import { Professional, Service, TimeSlot } from "@/types/types";
+import { toast } from "sonner";
+
+// Enhanced error handling helper
+const handleApiError = (error: any, context: string) => {
+  console.error(`Error in ${context}:`, error);
+  
+  if (isRLSError(error)) {
+    console.warn("RLS policy issue detected. This might be related to authentication or permissions.");
+  }
+  
+  if (error.code === 'PGRST116') {
+    console.warn("This appears to be a Postgrest error, likely related to the API request format.");
+  }
+  
+  throw error;
+};
 
 // Fetch all active professionals
 export const fetchProfessionals = async (): Promise<Professional[]> => {
@@ -11,15 +27,15 @@ export const fetchProfessionals = async (): Promise<Professional[]> => {
       .eq('active', true);
     
     if (error) {
-      console.error('Error fetching professionals:', error);
-      throw error;
+      handleApiError(error, 'fetchProfessionals');
     }
     
     console.log("Professionals data:", data);
     return data || [];
   } catch (err) {
     console.error('Unexpected error fetching professionals:', err);
-    throw err;
+    toast.error("Erro ao carregar profissionais. Tente novamente mais tarde.");
+    return [];
   }
 };
 
@@ -33,8 +49,7 @@ export const fetchProfessionalServices = async (professionalId: string): Promise
       .eq('professional_id', professionalId);
     
     if (error) {
-      console.error('Error fetching professional services:', error);
-      throw error;
+      handleApiError(error, 'fetchProfessionalServices');
     }
     
     if (!data || data.length === 0) {
@@ -51,15 +66,15 @@ export const fetchProfessionalServices = async (professionalId: string): Promise
       .eq('active', true);
     
     if (servicesError) {
-      console.error('Error fetching services:', servicesError);
-      throw servicesError;
+      handleApiError(servicesError, 'fetchProfessionalServices > services');
     }
     
     console.log(`Retrieved services:`, services);
     return services || [];
   } catch (err) {
     console.error('Unexpected error fetching professional services:', err);
-    throw err;
+    toast.error("Erro ao carregar serviços. Tente novamente mais tarde.");
+    return [];
   }
 };
 
@@ -82,8 +97,7 @@ export const fetchAvailableSlots = async (professionalId: string, date: Date): P
       .order('start_time');
     
     if (error) {
-      console.error('Error fetching available slots:', error);
-      throw error;
+      handleApiError(error, 'fetchAvailableSlots');
     }
     
     const slots = (data || []).map(slot => ({
@@ -98,7 +112,8 @@ export const fetchAvailableSlots = async (professionalId: string, date: Date): P
     return slots;
   } catch (err) {
     console.error('Unexpected error fetching available slots:', err);
-    throw err;
+    toast.error("Erro ao carregar horários disponíveis. Tente novamente mais tarde.");
+    return [];
   }
 };
 
@@ -156,6 +171,7 @@ export const createAppointment = async (
     };
   } catch (err) {
     console.error('Unexpected error creating appointment:', err);
+    toast.error("Erro ao criar agendamento. Tente novamente mais tarde.");
     return { success: false, error: err };
   }
 };
@@ -180,6 +196,7 @@ export const createProfessional = async (professional: Omit<Professional, 'id'>)
     
     if (error) {
       console.error('Error creating professional:', error);
+      console.error('Error details:', JSON.stringify(error));
       return { success: false, error };
     }
     
@@ -190,6 +207,7 @@ export const createProfessional = async (professional: Omit<Professional, 'id'>)
     };
   } catch (err) {
     console.error('Unexpected error creating professional:', err);
+    console.error('Error details:', JSON.stringify(err));
     return { success: false, error: err };
   }
 };
@@ -205,6 +223,7 @@ export const updateProfessional = async (id: string, professional: Partial<Profe
     
     if (error) {
       console.error('Error updating professional:', error);
+      console.error('Error details:', JSON.stringify(error));
       return false;
     }
     
@@ -212,6 +231,7 @@ export const updateProfessional = async (id: string, professional: Partial<Profe
     return true;
   } catch (err) {
     console.error('Unexpected error updating professional:', err);
+    console.error('Error details:', JSON.stringify(err));
     return false;
   }
 };
@@ -227,6 +247,7 @@ export const deleteProfessional = async (id: string): Promise<boolean> => {
     
     if (error) {
       console.error('Error deleting professional:', error);
+      console.error('Error details:', JSON.stringify(error));
       return false;
     }
     
@@ -234,6 +255,7 @@ export const deleteProfessional = async (id: string): Promise<boolean> => {
     return true;
   } catch (err) {
     console.error('Unexpected error deleting professional:', err);
+    console.error('Error details:', JSON.stringify(err));
     return false;
   }
 };
