@@ -68,7 +68,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <div className="md:w-64 bg-background border-r border-border flex flex-col">
         <div className="p-4 flex items-center border-b border-border h-16">
           <Link to="/" className="flex items-center">
-            <Logo className="h-8 w-auto" />
+            <Logo />
             <span className="ml-2 text-lg font-semibold">Salão Admin</span>
           </Link>
         </div>
