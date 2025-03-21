@@ -4,80 +4,102 @@ import { Professional, Service, TimeSlot } from "@/types/types";
 // Fetch all active professionals
 export const fetchProfessionals = async (): Promise<Professional[]> => {
   console.log("Fetching professionals...");
-  const { data, error } = await supabase
-    .from('professionals')
-    .select('*')
-    .eq('active', true);
-  
-  if (error) {
-    console.error('Error fetching professionals:', error);
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .select('*')
+      .eq('active', true);
+    
+    if (error) {
+      console.error('Error fetching professionals:', error);
+      throw error;
+    }
+    
+    console.log("Professionals data:", data);
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error fetching professionals:', err);
+    throw err;
   }
-  
-  console.log("Professionals data:", data);
-  return data || [];
 };
 
 // Fetch services for a specific professional
 export const fetchProfessionalServices = async (professionalId: string): Promise<Service[]> => {
-  const { data, error } = await supabase
-    .from('professional_services')
-    .select('service_id')
-    .eq('professional_id', professionalId);
-  
-  if (error) {
-    console.error('Error fetching professional services:', error);
-    throw error;
+  console.log(`Fetching services for professional ${professionalId}...`);
+  try {
+    const { data, error } = await supabase
+      .from('professional_services')
+      .select('service_id')
+      .eq('professional_id', professionalId);
+    
+    if (error) {
+      console.error('Error fetching professional services:', error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      return [];
+    }
+    
+    const serviceIds = data.map(item => item.service_id);
+    console.log(`Found service IDs:`, serviceIds);
+    
+    const { data: services, error: servicesError } = await supabase
+      .from('services')
+      .select('*')
+      .in('id', serviceIds)
+      .eq('active', true);
+    
+    if (servicesError) {
+      console.error('Error fetching services:', servicesError);
+      throw servicesError;
+    }
+    
+    console.log(`Retrieved services:`, services);
+    return services || [];
+  } catch (err) {
+    console.error('Unexpected error fetching professional services:', err);
+    throw err;
   }
-  
-  if (!data || data.length === 0) {
-    return [];
-  }
-  
-  const serviceIds = data.map(item => item.service_id);
-  
-  const { data: services, error: servicesError } = await supabase
-    .from('services')
-    .select('*')
-    .in('id', serviceIds)
-    .eq('active', true);
-  
-  if (servicesError) {
-    console.error('Error fetching services:', servicesError);
-    throw servicesError;
-  }
-  
-  return services || [];
 };
 
 // Fetch available time slots for a professional on a specific date
 export const fetchAvailableSlots = async (professionalId: string, date: Date): Promise<TimeSlot[]> => {
-  const selectedDate = new Date(date);
-  selectedDate.setHours(0, 0, 0, 0);
-  const nextDay = new Date(selectedDate);
-  nextDay.setDate(nextDay.getDate() + 1);
-  
-  const { data, error } = await supabase
-    .from('available_slots')
-    .select('*')
-    .eq('professional_id', professionalId)
-    .eq('is_available', true)
-    .gte('start_time', selectedDate.toISOString())
-    .lt('start_time', nextDay.toISOString())
-    .order('start_time');
-  
-  if (error) {
-    console.error('Error fetching available slots:', error);
-    throw error;
+  console.log(`Fetching slots for professional ${professionalId} on date ${date}...`);
+  try {
+    const selectedDate = new Date(date);
+    selectedDate.setHours(0, 0, 0, 0);
+    const nextDay = new Date(selectedDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    
+    const { data, error } = await supabase
+      .from('available_slots')
+      .select('*')
+      .eq('professional_id', professionalId)
+      .eq('is_available', true)
+      .gte('start_time', selectedDate.toISOString())
+      .lt('start_time', nextDay.toISOString())
+      .order('start_time');
+    
+    if (error) {
+      console.error('Error fetching available slots:', error);
+      throw error;
+    }
+    
+    const slots = (data || []).map(slot => ({
+      id: slot.id,
+      time: new Date(slot.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      available: slot.is_available,
+      start_time: slot.start_time,
+      end_time: slot.end_time
+    }));
+    
+    console.log(`Retrieved ${slots.length} available slots`);
+    return slots;
+  } catch (err) {
+    console.error('Unexpected error fetching available slots:', err);
+    throw err;
   }
-  
-  return (data || []).map(slot => ({
-    id: slot.id,
-    time: new Date(slot.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    available: slot.is_available,
-    start_time: slot.start_time,
-    end_time: slot.end_time
-  }));
 };
 
 // Create a new appointment
@@ -88,44 +110,54 @@ export const createAppointment = async (
   clientName: string,
   clientPhone: string
 ): Promise<{ success: boolean; appointmentId?: string; error?: any }> => {
-  const { error: slotError } = await supabase
-    .from('available_slots')
-    .update({ is_available: false })
-    .eq('id', slotId);
-  
-  if (slotError) {
-    console.error('Error updating slot availability:', slotError);
-    return { success: false, error: slotError };
-  }
-  
-  const { data, error } = await supabase
-    .from('appointments')
-    .insert([
-      {
-        professional_id: professionalId,
-        service_id: serviceId,
-        slot_id: slotId,
-        client_name: clientName,
-        client_phone: clientPhone,
-        status: 'confirmed'
-      }
-    ])
-    .select();
-  
-  if (error) {
-    console.error('Error creating appointment:', error);
-    await supabase
+  console.log(`Creating appointment for professional ${professionalId}, service ${serviceId}, slot ${slotId}...`);
+  try {
+    // First update slot availability
+    const { error: slotError } = await supabase
       .from('available_slots')
-      .update({ is_available: true })
+      .update({ is_available: false })
       .eq('id', slotId);
     
-    return { success: false, error };
+    if (slotError) {
+      console.error('Error updating slot availability:', slotError);
+      return { success: false, error: slotError };
+    }
+    
+    // Then create the appointment
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert([
+        {
+          professional_id: professionalId,
+          service_id: serviceId,
+          slot_id: slotId,
+          client_name: clientName,
+          client_phone: clientPhone,
+          status: 'confirmed'
+        }
+      ])
+      .select();
+    
+    if (error) {
+      console.error('Error creating appointment:', error);
+      // Revert slot availability change on error
+      await supabase
+        .from('available_slots')
+        .update({ is_available: true })
+        .eq('id', slotId);
+      
+      return { success: false, error };
+    }
+    
+    console.log(`Appointment created successfully:`, data?.[0]);
+    return {
+      success: true,
+      appointmentId: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating appointment:', err);
+    return { success: false, error: err };
   }
-  
-  return {
-    success: true,
-    appointmentId: data?.[0]?.id
-  };
 };
 
 // Admin API functions
@@ -133,92 +165,124 @@ export const createAppointment = async (
 // Create a new professional
 export const createProfessional = async (professional: Omit<Professional, 'id'>): Promise<{ success: boolean; id?: string; error?: any }> => {
   console.log("Creating professional:", professional);
-  
-  const { data, error } = await supabase
-    .from('professionals')
-    .insert([{
-      name: professional.name,
-      phone: professional.phone || null,
-      bio: professional.bio || null,
-      photo_url: professional.photo_url || null,
-      active: professional.active !== undefined ? professional.active : true,
-      user_id: professional.user_id || null
-    }])
-    .select();
-  
-  if (error) {
-    console.error('Error creating professional:', error);
-    return { success: false, error };
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .insert([{
+        name: professional.name,
+        phone: professional.phone || null,
+        bio: professional.bio || null,
+        photo_url: professional.photo_url || null,
+        active: professional.active !== undefined ? professional.active : true,
+        user_id: professional.user_id || null
+      }])
+      .select();
+    
+    if (error) {
+      console.error('Error creating professional:', error);
+      return { success: false, error };
+    }
+    
+    console.log("Professional created:", data);
+    return {
+      success: true,
+      id: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating professional:', err);
+    return { success: false, error: err };
   }
-  
-  console.log("Professional created:", data);
-  return {
-    success: true,
-    id: data?.[0]?.id
-  };
 };
 
 // Update a professional
 export const updateProfessional = async (id: string, professional: Partial<Professional>): Promise<boolean> => {
-  const { error } = await supabase
-    .from('professionals')
-    .update(professional)
-    .eq('id', id);
-  
-  if (error) {
-    console.error('Error updating professional:', error);
+  console.log(`Updating professional ${id}:`, professional);
+  try {
+    const { error } = await supabase
+      .from('professionals')
+      .update(professional)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating professional:', error);
+      return false;
+    }
+    
+    console.log("Professional updated successfully");
+    return true;
+  } catch (err) {
+    console.error('Unexpected error updating professional:', err);
     return false;
   }
-  
-  return true;
 };
 
 // Delete a professional
 export const deleteProfessional = async (id: string): Promise<boolean> => {
-  const { error } = await supabase
-    .from('professionals')
-    .update({ active: false })
-    .eq('id', id);
-  
-  if (error) {
-    console.error('Error deleting professional:', error);
+  console.log(`Deleting professional ${id}...`);
+  try {
+    const { error } = await supabase
+      .from('professionals')
+      .update({ active: false })
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting professional:', error);
+      return false;
+    }
+    
+    console.log("Professional deleted successfully");
+    return true;
+  } catch (err) {
+    console.error('Unexpected error deleting professional:', err);
     return false;
   }
-  
-  return true;
 };
 
 // Fetch all services
 export const fetchServices = async (): Promise<Service[]> => {
-  const { data, error } = await supabase
-    .from('services')
-    .select('*')
-    .eq('active', true);
-  
-  if (error) {
-    console.error('Error fetching services:', error);
-    throw error;
+  console.log("Fetching services...");
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .eq('active', true);
+    
+    if (error) {
+      console.error('Error fetching services:', error);
+      throw error;
+    }
+    
+    console.log(`Retrieved ${data?.length || 0} services`);
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error fetching services:', err);
+    throw err;
   }
-  
-  return data || [];
 };
 
 // Create a new service
 export const createService = async (service: Omit<Service, 'id'>): Promise<{ success: boolean; id?: string; error?: any }> => {
-  const { data, error } = await supabase
-    .from('services')
-    .insert([service])
-    .select();
-  
-  if (error) {
-    console.error('Error creating service:', error);
-    return { success: false, error };
+  console.log("Creating service:", service);
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .insert([service])
+      .select();
+    
+    if (error) {
+      console.error('Error creating service:', error);
+      return { success: false, error };
+    }
+    
+    console.log("Service created:", data);
+    return {
+      success: true,
+      id: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating service:', err);
+    return { success: false, error: err };
   }
-  
-  return {
-    success: true,
-    id: data?.[0]?.id
-  };
 };
 
 // Update a service
@@ -290,25 +354,32 @@ export const createAvailableSlot = async (
   startTime: Date,
   endTime: Date
 ): Promise<{ success: boolean; id?: string; error?: any }> => {
-  const { data, error } = await supabase
-    .from('available_slots')
-    .insert([{
-      professional_id: professionalId,
-      start_time: startTime.toISOString(),
-      end_time: endTime.toISOString(),
-      is_available: true
-    }])
-    .select();
-  
-  if (error) {
-    console.error('Error creating available slot:', error);
-    return { success: false, error };
+  console.log(`Creating slot for professional ${professionalId} from ${startTime} to ${endTime}...`);
+  try {
+    const { data, error } = await supabase
+      .from('available_slots')
+      .insert([{
+        professional_id: professionalId,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        is_available: true
+      }])
+      .select();
+    
+    if (error) {
+      console.error('Error creating available slot:', error);
+      return { success: false, error };
+    }
+    
+    console.log("Available slot created:", data);
+    return {
+      success: true,
+      id: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating available slot:', err);
+    return { success: false, error: err };
   }
-  
-  return {
-    success: true,
-    id: data?.[0]?.id
-  };
 };
 
 // Fetch all available slots for a professional (for admin)
