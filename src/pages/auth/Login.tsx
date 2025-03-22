@@ -23,11 +23,11 @@ const Login = () => {
       if (session) {
         const { data: userData } = await supabase
           .from('users')
-          .select('tipo_usuario')
+          .select('role')
           .eq('auth_id', session.user.id)
           .single();
         
-        if (userData && userData.tipo_usuario === 'superadmin') {
+        if (userData && userData.role === 'superadmin') {
           navigate('/superadmin/dashboard');
         } else {
           navigate('/admin/dashboard');
@@ -43,13 +43,13 @@ const Login = () => {
         try {
           const { data: userData, error } = await supabase
             .from('users')
-            .select('tipo_usuario')
+            .select('role')
             .eq('auth_id', session.user.id)
             .single();
           
           if (error) throw error;
           
-          if (userData && userData.tipo_usuario === 'superadmin') {
+          if (userData && userData.role === 'superadmin') {
             navigate('/superadmin/dashboard');
           } else {
             navigate('/admin/dashboard');

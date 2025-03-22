@@ -1,119 +1,143 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+interface WebhookPayload {
+  evento: string;
+  id_agendamento: string;
+  [key: string]: any;
+}
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://ddsdidxdwdbqdoyczhyq.supabase.co';
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-serve(async (req) => {
-  // Handle CORS preflight request
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+Deno.serve(async (req) => {
   try {
-    // Parse the webhook payload
-    const payload = await req.json();
-    const eventType = payload.evento;
-    console.log(`Processing webhook for event: ${eventType}`);
-    console.log(`Payload: ${JSON.stringify(payload)}`);
+    // Handle CORS preflight request
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+        status: 204,
+      });
+    }
 
-    // Get webhook URL
-    const { data: webhookConfigs, error: webhookError } = await supabase
+    // Only handle POST requests
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Parse the request body
+    const payload: WebhookPayload = await req.json();
+    console.log('Received webhook payload:', payload);
+
+    // Get webhook configurations
+    const { data: webhookConfigs, error: configError } = await supabase
       .from('webhook_configurations')
       .select('*')
-      .eq('is_active', true)
-      .limit(1);
+      .eq('is_active', true);
 
-    if (webhookError || !webhookConfigs.length) {
-      console.error('No active webhook configurations found', webhookError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'No active webhook configurations' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
-      );
+    if (configError) {
+      console.error('Error fetching webhook configurations:', configError);
+      return new Response(JSON.stringify({ error: 'Internal server error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    const webhookUrl = webhookConfigs[0].url;
-    const webhookId = webhookConfigs[0].id;
-    
-    // Send the webhook
-    let success = false;
-    let attempts = 0;
-    let statusCode = 0;
-    let responseText = '';
+    if (!webhookConfigs || webhookConfigs.length === 0) {
+      console.log('No active webhook configurations found');
+      return new Response(JSON.stringify({ message: 'No webhooks to process' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Try up to 3 times
-    while (!success && attempts < 3) {
-      attempts++;
-      
-      try {
-        console.log(`Attempt ${attempts}: Sending webhook to ${webhookUrl}`);
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
+    // Process each webhook
+    const results = await Promise.allSettled(
+      webhookConfigs.map(async (config) => {
+        let attempts = 1;
+        let success = false;
+        let lastError = null;
         
-        statusCode = response.status;
-        responseText = await response.text();
-        success = response.ok;
-        
-        console.log(`Webhook response (${statusCode}): ${responseText}`);
-        
-        if (success) break;
-        
-        // Wait before retrying (exponential backoff)
-        if (attempts < 3) {
-          const waitTime = Math.pow(2, attempts) * 1000;
-          console.log(`Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+        // Try up to 3 times
+        while (attempts <= 3 && !success) {
+          try {
+            const response = await fetch(config.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+              success = true;
+              console.log(`Webhook sent successfully to ${config.url} on attempt ${attempts}`);
+            } else {
+              lastError = `HTTP error: ${response.status} ${response.statusText}`;
+              console.error(`Failed to send webhook on attempt ${attempts}: ${lastError}`);
+              attempts++;
+              // Wait a bit before retrying (exponential backoff)
+              if (attempts <= 3) {
+                await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+              }
+            }
+          } catch (error) {
+            lastError = error.message || 'Unknown error';
+            console.error(`Error sending webhook on attempt ${attempts}:`, error);
+            attempts++;
+            // Wait a bit before retrying
+            if (attempts <= 3) {
+              await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+            }
+          }
         }
-      } catch (err) {
-        console.error(`Webhook delivery error on attempt ${attempts}:`, err);
-      }
-    }
 
-    // Update the webhook log
-    const status = success ? 'delivered' : 'failed';
-    const { error: logError } = await supabase
-      .from('webhook_logs')
-      .update({
-        status,
-        attempts,
-        updated_at: new Date().toISOString(),
+        // Update the log
+        const { error: logError } = await supabase
+          .from('webhook_logs')
+          .update({
+            status: success ? 'success' : 'failed',
+            attempts,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('webhook_id', config.id)
+          .eq('event_type', payload.evento)
+          .eq('payload', payload);
+
+        if (logError) {
+          console.error('Error updating webhook log:', logError);
+        }
+
+        return {
+          webhookId: config.id,
+          success,
+          attempts,
+          error: lastError,
+        };
       })
-      .eq('webhook_id', webhookId)
-      .eq('event_type', eventType)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (logError) {
-      console.error('Error updating webhook log:', logError);
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success, 
-        attempts, 
-        statusCode,
-        response: responseText
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
+    return new Response(JSON.stringify({ 
+      message: 'Webhook processing completed',
+      results 
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    console.error('Error processing webhook:', error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    console.error('Unhandled error in webhook processor:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 });

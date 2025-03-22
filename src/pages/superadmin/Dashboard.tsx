@@ -24,13 +24,13 @@ const SuperAdminDashboard = () => {
         
         const { data: userData, error } = await supabase
           .from('users')
-          .select('tipo_usuario')
+          .select('role')
           .eq('auth_id', session.user.id)
           .single();
         
         if (error) throw error;
         
-        if (!userData || userData.tipo_usuario !== 'superadmin') {
+        if (!userData || userData.role !== 'superadmin') {
           navigate('/admin/dashboard');
           return;
         }
