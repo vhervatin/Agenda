@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, Calendar, User, Clock, Scissors } from 'lucide-react';
@@ -37,8 +36,32 @@ const AppointmentSuccess = () => {
           return;
         }
         
-        setAppointment(data);
-        setService(data.services);
+        const appointmentData: Appointment = {
+          id: data.id,
+          professional_id: data.professional_id,
+          service_id: data.service_id,
+          slot_id: data.slot_id,
+          client_name: data.client_name,
+          client_phone: data.client_phone,
+          status: data.status as 'confirmed' | 'cancelled' | 'completed',
+          created_at: data.created_at,
+          professionals: data.professionals,
+          services: data.services,
+          slots: data.slots
+        };
+        
+        setAppointment(appointmentData);
+        
+        if (data.services) {
+          const serviceData: Service = {
+            id: data.service_id,
+            name: data.services.name,
+            description: data.services.description,
+            duration: data.services.duration,
+            price: data.services.price
+          };
+          setService(serviceData);
+        }
       } catch (err) {
         console.error('Unexpected error:', err);
       } finally {

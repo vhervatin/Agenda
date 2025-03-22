@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,14 +13,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DatePicker } from '@/components/ui/calendar';
+import { Calendar } from '@/components/ui/calendar';
+import DatePicker from '@/components/DatePicker';
 import {
   Building2,
   PlusCircle,
   Edit,
   Trash2,
   Globe,
-  Calendar,
+  Calendar as CalendarIcon,
   DollarSign,
   Palette,
   Image
@@ -31,7 +31,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormDescription, FormLabel, FormMessage } from '@/components/ui/form';
 import { fetchCompanies, createCompany, updateCompany } from '@/services/api';
-import { Company } from '@/types/webhook';
+import { Company } from '@/types/types';
 import { format, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -648,7 +648,6 @@ const Companies = () => {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onEdit)} className="space-y-6">
-              {/* Identical form content as Add Dialog */}
               <Tabs defaultValue="info">
                 <TabsList className="grid grid-cols-3">
                   <TabsTrigger value="info">Informações</TabsTrigger>
@@ -656,9 +655,7 @@ const Companies = () => {
                   <TabsTrigger value="plan">Plano</TabsTrigger>
                 </TabsList>
                 
-                {/* Info tab */}
                 <TabsContent value="info" className="space-y-4 pt-4">
-                  {/* Same fields as Add Dialog */}
                   <FormField
                     control={form.control}
                     name="name"
@@ -738,9 +735,7 @@ const Companies = () => {
                   />
                 </TabsContent>
                 
-                {/* Appearance tab */}
                 <TabsContent value="appearance" className="space-y-4 pt-4">
-                  {/* Same fields as Add Dialog */}
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -825,9 +820,7 @@ const Companies = () => {
                   </div>
                 </TabsContent>
                 
-                {/* Plan tab */}
                 <TabsContent value="plan" className="space-y-4 pt-4">
-                  {/* Same fields as Add Dialog */}
                   <FormField
                     control={form.control}
                     name="plan"

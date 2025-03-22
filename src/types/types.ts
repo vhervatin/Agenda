@@ -56,3 +56,28 @@ export interface User {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  plan?: string;
+  plan_value?: number;
+  plan_expiry_date?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WebhookConfiguration {
+  id: string;
+  url: string;
+  event_type?: string;
+  company_id?: string;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
