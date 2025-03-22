@@ -35,6 +35,9 @@ export interface Appointment {
   client_phone: string;
   status: 'confirmed' | 'cancelled' | 'completed';
   created_at?: string;
+  services?: Service;
+  professionals?: Professional;
+  slots?: TimeSlot;
 }
 
 export interface ProfessionalService {
@@ -50,4 +53,6 @@ export interface User {
   role: 'admin' | 'professional';
   tipo_usuario?: 'admin' | 'superadmin';
   auth_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }

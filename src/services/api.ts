@@ -1,5 +1,6 @@
 import { supabase, isRLSError } from "@/integrations/supabase/client";
-import { Professional, Service, TimeSlot } from "@/types/types";
+import { Professional, Service, TimeSlot, User } from "@/types/types";
+import { Company, WebhookConfiguration, WebhookLog } from "@/types/webhook";
 import { toast } from "sonner";
 
 // Enhanced error handling helper
@@ -605,5 +606,257 @@ export const createAvailableSlotsBulk = async (
   } catch (err) {
     console.error('Unexpected error creating bulk available slots:', err);
     return { success: false, count: 0, error: err };
+  }
+};
+
+// Webhook Management
+export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration[]> => {
+  console.log("Fetching webhook configurations...");
+  try {
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching webhook configurations:', error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error fetching webhook configurations:', err);
+    throw err;
+  }
+};
+
+export const fetchWebhookLogs = async (): Promise<WebhookLog[]> => {
+  console.log("Fetching webhook logs...");
+  try {
+    const { data, error } = await supabase
+      .from('webhook_logs')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching webhook logs:', error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error fetching webhook logs:', err);
+    throw err;
+  }
+};
+
+export const createWebhookConfiguration = async (webhook: Partial<WebhookConfiguration>): Promise<{ success: boolean; id?: string; error?: any }> => {
+  console.log("Creating webhook configuration:", webhook);
+  try {
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .insert([webhook])
+      .select();
+    
+    if (error) {
+      console.error('Error creating webhook configuration:', error);
+      return { success: false, error };
+    }
+    
+    return {
+      success: true,
+      id: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating webhook configuration:', err);
+    return { success: false, error: err };
+  }
+};
+
+export const updateWebhookConfiguration = async (id: string, webhook: Partial<WebhookConfiguration>): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('webhook_configurations')
+      .update(webhook)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating webhook configuration:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Unexpected error updating webhook configuration:', err);
+    return false;
+  }
+};
+
+export const testWebhook = async (url: string, eventType: string, payload?: any): Promise<any> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('test-webhook', {
+      body: { url, event_type: eventType, payload }
+    });
+    
+    if (error) {
+      console.error('Error testing webhook:', error);
+      throw error;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('Unexpected error testing webhook:', err);
+    throw err;
+  }
+};
+
+// Company Management
+export const fetchCompanies = async (): Promise<Company[]> => {
+  console.log("Fetching companies...");
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching companies:', error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error fetching companies:', err);
+    throw err;
+  }
+};
+
+export const fetchCompany = async (id: string): Promise<Company | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching company:', error);
+      throw error;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('Unexpected error fetching company:', err);
+    return null;
+  }
+};
+
+export const createCompany = async (company: Partial<Company>): Promise<{ success: boolean; id?: string; error?: any }> => {
+  console.log("Creating company:", company);
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .insert([company])
+      .select();
+    
+    if (error) {
+      console.error('Error creating company:', error);
+      return { success: false, error };
+    }
+    
+    return {
+      success: true,
+      id: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating company:', err);
+    return { success: false, error: err };
+  }
+};
+
+export const updateCompany = async (id: string, company: Partial<Company>): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('companies')
+      .update(company)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating company:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Unexpected error updating company:', err);
+    return false;
+  }
+};
+
+export const checkCompanyStatus = async (slug: string): Promise<{ isActive: boolean; expiryDate?: string; planName?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('is_active, plan_expiry_date, plan')
+      .eq('slug', slug)
+      .single();
+    
+    if (error) {
+      console.error('Error checking company status:', error);
+      return { isActive: false };
+    }
+    
+    return {
+      isActive: data?.is_active || false,
+      expiryDate: data?.plan_expiry_date,
+      planName: data?.plan
+    };
+  } catch (err) {
+    console.error('Unexpected error checking company status:', err);
+    return { isActive: false };
+  }
+};
+
+// User Management functions
+export const fetchUserByAuthId = async (authId: string): Promise<User | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('Unexpected error fetching user:', err);
+    return null;
+  }
+};
+
+export const createUser = async (user: Partial<User>): Promise<{ success: boolean; id?: string; error?: any }> => {
+  console.log("Creating user:", user);
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .insert([user])
+      .select();
+    
+    if (error) {
+      console.error('Error creating user:', error);
+      return { success: false, error };
+    }
+    
+    return {
+      success: true,
+      id: data?.[0]?.id
+    };
+  } catch (err) {
+    console.error('Unexpected error creating user:', err);
+    return { success: false, error: err };
   }
 };

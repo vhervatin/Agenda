@@ -1,569 +1,962 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Building, Edit, Trash, Link as LinkIcon, Copy, Eye, AlertCircle, Calendar } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/calendar';
+import {
+  Building2,
+  PlusCircle,
+  Edit,
+  Trash2,
+  Globe,
+  Calendar,
+  DollarSign,
+  Palette,
+  Image
+} from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormDescription, FormLabel, FormMessage } from '@/components/ui/form';
+import { fetchCompanies, createCompany, updateCompany } from '@/services/api';
 import { Company } from '@/types/webhook';
+import { format, addMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-const CompaniesPage = () => {
-  const navigate = useNavigate();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [primaryColor, setPrimaryColor] = useState('#663399');
-  const [secondaryColor, setSecondaryColor] = useState('#FFA500');
-  const [slug, setSlug] = useState('');
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+// Import SuperAdminLayout from Dashboard.tsx
+import SuperAdminDashboard from './Dashboard';
+
+// Re-define SuperAdminLayout type for this file
+type SuperAdminLayoutProps = React.ComponentProps<typeof SuperAdminDashboard>;
+const SuperAdminLayout: React.FC<{ children: React.ReactNode, title?: string }> = (props) => {
+  // @ts-ignore - TypeScript doesn't know about the Dashboard component structure
+  const DashboardComponent = SuperAdminDashboard as any;
+  // Extract the layout component from Dashboard
+  return DashboardComponent.type.type.render(props);
+};
+
+// Create a schema for company creation
+const companySchema = z.object({
+  name: z.string().min(2, { message: 'Nome deve ter pelo menos 2 caracteres' }),
+  slug: z.string()
+    .min(3, { message: 'Slug deve ter pelo menos 3 caracteres' })
+    .regex(/^[a-z0-9-]+$/, { message: 'Slug deve conter apenas letras minúsculas, números e hífens' }),
+  logo_url: z.string().optional(),
+  primary_color: z.string().default('#663399'),
+  secondary_color: z.string().default('#FFA500'),
+  plan: z.enum(['basic', 'premium', 'enterprise']).default('basic'),
+  plan_value: z.coerce.number().min(0).default(0),
+  plan_expiry_date: z.date().optional(),
+  is_active: z.boolean().default(true)
+});
+
+type CompanyFormValues = z.infer<typeof companySchema>;
+
+const PLANS = [
+  { value: 'basic', label: 'Básico', description: 'Plano básico com funcionalidades essenciais', price: 49.90 },
+  { value: 'premium', label: 'Premium', description: 'Plano premium com funcionalidades avançadas', price: 99.90 },
+  { value: 'enterprise', label: 'Enterprise', description: 'Plano empresarial com suporte dedicado', price: 199.90 }
+];
+
+const Companies = () => {
+  const queryClient = useQueryClient();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   
-  // Plan management
-  const [planType, setPlanType] = useState('basic');
-  const [planValue, setPlanValue] = useState('0');
-  const [planExpiryDate, setPlanExpiryDate] = useState('');
-
-  useEffect(() => {
-    const checkAccess = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          navigate('/login');
-          return;
-        }
-        
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('tipo_usuario')
-          .eq('auth_id', session.user.id)
-          .single();
-        
-        if (error || !userData || userData.tipo_usuario !== 'superadmin') {
-          navigate('/admin/dashboard');
-          return;
-        }
-        
-        fetchCompanies();
-      } catch (error) {
-        console.error('Error checking access:', error);
-        navigate('/login');
-      }
+  // Form
+  const form = useForm<CompanyFormValues>({
+    resolver: zodResolver(companySchema),
+    defaultValues: {
+      name: '',
+      slug: '',
+      logo_url: '',
+      primary_color: '#663399',
+      secondary_color: '#FFA500',
+      plan: 'basic',
+      plan_value: 49.90,
+      is_active: true
+    }
+  });
+  
+  // Fetch companies
+  const { data: companies = [], isLoading } = useQuery({
+    queryKey: ['companies'],
+    queryFn: fetchCompanies
+  });
+  
+  // Create company mutation
+  const createMutation = useMutation({
+    mutationFn: (company: Partial<Company>) => createCompany(company),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      setIsAddDialogOpen(false);
+      form.reset();
+      toast.success('Empresa criada com sucesso');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao criar empresa: ${error.message}`);
+    }
+  });
+  
+  // Update company mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, company }: { id: string; company: Partial<Company> }) => 
+      updateCompany(id, company),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      setIsEditDialogOpen(false);
+      toast.success('Empresa atualizada com sucesso');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar empresa: ${error.message}`);
+    }
+  });
+  
+  // Delete company mutation (soft delete by setting is_active = false)
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => updateCompany(id, { is_active: false }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      setIsDeleteDialogOpen(false);
+      toast.success('Empresa desativada com sucesso');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao desativar empresa: ${error.message}`);
+    }
+  });
+  
+  const onSubmit = (data: CompanyFormValues) => {
+    // Format the data for API
+    const companyData: Partial<Company> = {
+      ...data,
+      plan_expiry_date: data.plan_expiry_date ? data.plan_expiry_date.toISOString() : undefined
     };
     
-    checkAccess();
-  }, [navigate]);
-
-  const fetchCompanies = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('name', { ascending: true });
-      
-      if (error) throw error;
-      
-      setCompanies(data as Company[]);
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      toast.error('Erro ao carregar empresas');
-    } finally {
-      setIsLoading(false);
+    createMutation.mutate(companyData);
+  };
+  
+  const onEdit = (data: CompanyFormValues) => {
+    if (!selectedCompany) return;
+    
+    // Format the data for API
+    const companyData: Partial<Company> = {
+      ...data,
+      plan_expiry_date: data.plan_expiry_date ? data.plan_expiry_date.toISOString() : undefined
+    };
+    
+    updateMutation.mutate({ id: selectedCompany.id, company: companyData });
+  };
+  
+  const handleDelete = () => {
+    if (!selectedCompany) return;
+    deleteMutation.mutate(selectedCompany.id);
+  };
+  
+  const openEditDialog = (company: Company) => {
+    setSelectedCompany(company);
+    
+    // Set form values
+    form.reset({
+      name: company.name,
+      slug: company.slug,
+      logo_url: company.logo_url || '',
+      primary_color: company.primary_color || '#663399',
+      secondary_color: company.secondary_color || '#FFA500',
+      plan: (company.plan as any) || 'basic',
+      plan_value: company.plan_value || 0,
+      plan_expiry_date: company.plan_expiry_date ? new Date(company.plan_expiry_date) : undefined,
+      is_active: company.is_active !== false
+    });
+    
+    setIsEditDialogOpen(true);
+  };
+  
+  const openDeleteDialog = (company: Company) => {
+    setSelectedCompany(company);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const handlePlanChange = (value: string) => {
+    const plan = PLANS.find(p => p.value === value);
+    if (plan) {
+      form.setValue('plan_value', plan.price);
     }
   };
-
-  const handleOpenDialog = (company: Company | null = null) => {
-    if (company) {
-      setEditingCompany(company);
-      setName(company.name);
-      setPrimaryColor(company.primary_color || '#663399');
-      setSecondaryColor(company.secondary_color || '#FFA500');
-      setSlug(company.slug);
+  
+  const generateRandomSlug = () => {
+    const companyName = form.getValues('name');
+    if (!companyName) {
+      toast.error('Preencha o nome da empresa primeiro');
+      return;
+    }
+    
+    const baseSlug = companyName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    
+    // Check if slug already exists
+    const slugExists = companies.some(c => c.slug === baseSlug);
+    
+    if (slugExists) {
+      const randomPart = Math.floor(Math.random() * 1000);
+      form.setValue('slug', `${baseSlug}-${randomPart}`);
     } else {
-      setEditingCompany(null);
-      setName('');
-      setPrimaryColor('#663399');
-      setSecondaryColor('#FFA500');
-      setSlug('');
-    }
-    
-    setIsDialogOpen(true);
-  };
-
-  const handleOpenPlanDialog = (company: Company) => {
-    setEditingCompany(company);
-    setPlanType(company.plan || 'basic');
-    setPlanValue(company.plan_value?.toString() || '0');
-    setPlanExpiryDate(company.plan_expiry_date?.split('T')[0] || '');
-    setIsPlanDialogOpen(true);
-  };
-
-  const handleSavePlan = async () => {
-    if (!editingCompany) return;
-    
-    setIsSaving(true);
-    
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .update({
-          plan: planType,
-          plan_value: parseFloat(planValue),
-          plan_expiry_date: planExpiryDate ? new Date(planExpiryDate).toISOString() : null,
-          is_active: new Date(planExpiryDate) > new Date() || !planExpiryDate
-        })
-        .eq('id', editingCompany.id);
-      
-      if (error) throw error;
-      
-      toast.success('Plano atualizado com sucesso');
-      setIsPlanDialogOpen(false);
-      fetchCompanies();
-    } catch (error: any) {
-      console.error('Error saving plan:', error);
-      toast.error(`Erro ao salvar plano: ${error.message}`);
-    } finally {
-      setIsSaving(false);
+      form.setValue('slug', baseSlug);
     }
   };
-
-  const handleSaveCompany = async () => {
-    if (!name || !slug) {
-      toast.error('Por favor, preencha todos os campos obrigatórios');
-      return;
-    }
-    
-    // Simple slug validation (lowercase, no spaces, only letters, numbers, and hyphens)
-    const slugRegex = /^[a-z0-9-]+$/;
-    if (!slugRegex.test(slug)) {
-      toast.error('O slug deve conter apenas letras minúsculas, números e hífens');
-      return;
-    }
-    
-    setIsSaving(true);
-    
-    try {
-      // Check if slug is unique when creating a new company
-      if (!editingCompany) {
-        const { data, error } = await supabase
-          .from('companies')
-          .select('id')
-          .eq('slug', slug)
-          .single();
-        
-        if (data) {
-          toast.error('Este slug já está em uso. Por favor, escolha outro.');
-          setIsSaving(false);
-          return;
-        }
-      } else if (editingCompany.slug !== slug) {
-        // Check if slug is unique when changing the slug of an existing company
-        const { data, error } = await supabase
-          .from('companies')
-          .select('id')
-          .eq('slug', slug)
-          .single();
-        
-        if (data && data.id !== editingCompany.id) {
-          toast.error('Este slug já está em uso. Por favor, escolha outro.');
-          setIsSaving(false);
-          return;
-        }
-      }
-      
-      const companyData = {
-        name,
-        primary_color: primaryColor,
-        secondary_color: secondaryColor,
-        slug,
-        is_active: true
-      };
-      
-      let result;
-      
-      if (editingCompany) {
-        // Update existing company
-        result = await supabase
-          .from('companies')
-          .update(companyData)
-          .eq('id', editingCompany.id);
-      } else {
-        // Create new company
-        result = await supabase
-          .from('companies')
-          .insert([companyData]);
-      }
-      
-      if (result.error) throw result.error;
-      
-      toast.success(editingCompany ? 'Empresa atualizada com sucesso' : 'Empresa criada com sucesso');
-      setIsDialogOpen(false);
-      fetchCompanies();
-    } catch (error: any) {
-      console.error('Error saving company:', error);
-      toast.error(`Erro ao salvar empresa: ${error.message}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeleteCompany = async (company: Company) => {
-    if (!confirm(`Tem certeza que deseja excluir a empresa "${company.name}"? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .delete()
-        .eq('id', company.id);
-      
-      if (error) throw error;
-      
-      toast.success('Empresa excluída com sucesso');
-      fetchCompanies();
-    } catch (error: any) {
-      console.error('Error deleting company:', error);
-      toast.error(`Erro ao excluir empresa: ${error.message}`);
-    }
-  };
-
-  const copyPublicUrl = (slug: string) => {
-    const url = `${window.location.origin}/${slug}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Link copiado para a área de transferência');
-  };
-
-  const generateSlug = () => {
-    if (name) {
-      const newSlug = name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
-      
-      setSlug(newSlug);
-    }
-  };
-
-  const isCompanyActive = (company: Company) => {
-    if (!company.plan_expiry_date) return true;
-    return new Date(company.plan_expiry_date) > new Date();
-  };
-
+  
   return (
-    <AdminLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Gerenciar Empresas</h1>
-          <Button onClick={() => handleOpenDialog()}>
-            Adicionar Empresa
-          </Button>
+    <SuperAdminLayout title="Empresas">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <p className="text-muted-foreground">
+            Gerencie as empresas cadastradas na plataforma
+          </p>
         </div>
-        
-        {isLoading ? (
-          <div className="text-center py-8">Carregando empresas...</div>
-        ) : companies.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Building className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-xl font-medium mb-2">Nenhuma empresa cadastrada</p>
-              <p className="text-muted-foreground mb-6">Adicione sua primeira empresa para começar</p>
-              <Button onClick={() => handleOpenDialog()}>
-                Adicionar Empresa
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Empresas</CardTitle>
-              <CardDescription>
-                Gerencie todas as empresas do sistema
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Cores</TableHead>
-                    <TableHead>Link Público</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {companies.map((company) => (
-                    <TableRow key={company.id}>
-                      <TableCell className="font-medium">{company.name}</TableCell>
-                      <TableCell>{company.slug}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium capitalize">{company.plan || 'Básico'}</span>
-                          {company.plan_value ? (
-                            <span className="text-xs text-muted-foreground">
-                              R$ {company.plan_value.toFixed(2).replace('.', ',')}
-                            </span>
-                          ) : null}
-                          {company.plan_expiry_date && (
-                            <span className="text-xs text-muted-foreground">
-                              Expira: {new Date(company.plan_expiry_date).toLocaleDateString('pt-BR')}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {isCompanyActive(company) ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Ativo
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            Expirado
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <div 
-                            className="w-6 h-6 rounded-full border"
-                            style={{ backgroundColor: company.primary_color || '#663399' }}
-                          />
-                          <div 
-                            className="w-6 h-6 rounded-full border"
-                            style={{ backgroundColor: company.secondary_color || '#FFA500' }}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => copyPublicUrl(company.slug)}>
-                          <LinkIcon className="h-4 w-4 mr-1" />
-                          /{company.slug}
-                          <Copy className="h-3 w-3 ml-1" />
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="sm" onClick={() => window.open(`/${company.slug}`, '_blank')}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenPlanDialog(company)}>
-                          <Calendar className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(company)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCompany(company)}>
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+        <Button onClick={() => {
+          form.reset({
+            name: '',
+            slug: '',
+            logo_url: '',
+            primary_color: '#663399',
+            secondary_color: '#FFA500',
+            plan: 'basic',
+            plan_value: 49.90,
+            plan_expiry_date: addMonths(new Date(), 1),
+            is_active: true
+          });
+          setIsAddDialogOpen(true);
+        }}>
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Nova Empresa
+        </Button>
       </div>
       
-      {/* Create/Edit Company Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingCompany ? 'Editar Empresa' : 'Adicionar Empresa'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingCompany 
-                ? 'Edite os detalhes da empresa selecionada.' 
-                : 'Preencha os detalhes para criar uma nova empresa.'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome da Empresa *</Label>
-              <Input 
-                id="name" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Salão Beleza Total"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="slug">Slug da Empresa (URL) *</Label>
-              <div className="flex space-x-2">
-                <Input 
-                  id="slug" 
-                  value={slug} 
-                  onChange={(e) => setSlug(e.target.value)}
-                  placeholder="Ex: salao-beleza-total"
-                />
-                <Button 
-                  variant="outline" 
-                  type="button"
-                  onClick={generateSlug}
-                  disabled={!name}
-                >
-                  Gerar
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                URL pública: {window.location.origin}/{slug || 'sua-empresa'}
+      <Card>
+        <CardHeader>
+          <CardTitle>Empresas</CardTitle>
+          <CardDescription>
+            Lista de empresas cadastradas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-4">Carregando empresas...</div>
+          ) : companies.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+              <p>Nenhuma empresa cadastrada.</p>
+              <p className="text-sm mt-2">
+                Comece cadastrando uma nova empresa usando o botão acima.
               </p>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="primaryColor">Cor Primária</Label>
-                <div className="flex space-x-2">
-                  <div 
-                    className="w-8 h-8 rounded-full border"
-                    style={{ backgroundColor: primaryColor }}
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Plano</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px]">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {companies.map((company) => (
+                  <TableRow key={company.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center space-x-2">
+                        {company.logo_url ? (
+                          <img 
+                            src={company.logo_url} 
+                            alt={company.name} 
+                            className="h-6 w-6 rounded object-cover"
+                          />
+                        ) : (
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span>{company.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <Globe className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{company.slug}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="capitalize">{company.plan || 'basic'}</span>
+                    </TableCell>
+                    <TableCell>
+                      R$ {company.plan_value?.toFixed(2) || '0.00'}
+                    </TableCell>
+                    <TableCell>
+                      {company.plan_expiry_date ? (
+                        format(new Date(company.plan_expiry_date), 'dd/MM/yyyy')
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Switch 
+                          checked={company.is_active} 
+                          onCheckedChange={() => 
+                            updateMutation.mutate({ 
+                              id: company.id, 
+                              company: { is_active: !company.is_active } 
+                            })
+                          }
+                          disabled={updateMutation.isPending}
+                        />
+                        <span className={company.is_active ? 'text-green-600' : 'text-muted-foreground'}>
+                          {company.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => openEditDialog(company)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => openDeleteDialog(company)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Add Company Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Nova Empresa</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Tabs defaultValue="info">
+                <TabsList className="grid grid-cols-3">
+                  <TabsTrigger value="info">Informações</TabsTrigger>
+                  <TabsTrigger value="appearance">Aparência</TabsTrigger>
+                  <TabsTrigger value="plan">Plano</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="info" className="space-y-4 pt-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome da Empresa</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome da empresa" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                  <Input 
-                    id="primaryColor" 
-                    type="color"
-                    value={primaryColor} 
-                    onChange={(e) => setPrimaryColor(e.target.value)}
+                  
+                  <div className="flex items-end gap-2">
+                    <FormField
+                      control={form.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Slug</FormLabel>
+                          <FormControl>
+                            <Input placeholder="empresa-slug" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            URL única da empresa: app.seudominio.com/{field.value}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={generateRandomSlug}
+                    >
+                      Gerar
+                    </Button>
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="logo_url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL do Logo</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com/logo.png" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          URL da imagem do logo da empresa
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-              </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="is_active"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 rounded-md border p-3">
+                        <FormControl>
+                          <Switch 
+                            checked={field.value} 
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-0.5">
+                          <FormLabel>Ativo</FormLabel>
+                          <FormDescription>
+                            Empresa ativa e disponível para acesso
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="appearance" className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="primary_color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cor Primária</FormLabel>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="h-8 w-8 rounded-full border" 
+                              style={{ backgroundColor: field.value }}
+                            />
+                            <FormControl>
+                              <Input type="color" {...field} />
+                            </FormControl>
+                          </div>
+                          <FormDescription>
+                            Cor principal da marca
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="secondary_color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cor Secundária</FormLabel>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="h-8 w-8 rounded-full border" 
+                              style={{ backgroundColor: field.value }}
+                            />
+                            <FormControl>
+                              <Input type="color" {...field} />
+                            </FormControl>
+                          </div>
+                          <FormDescription>
+                            Cor de destaque secundária
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="mt-6">
+                    <Label>Prévia</Label>
+                    <div className="mt-2 border rounded-md p-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center" style={{ 
+                            backgroundColor: form.getValues('primary_color'),
+                            color: 'white'
+                          }}>
+                            <Building2 className="h-4 w-4" />
+                          </div>
+                          <span className="font-semibold">{form.getValues('name') || 'Nome da Empresa'}</span>
+                        </div>
+                        <Button style={{ 
+                          backgroundColor: form.getValues('primary_color'),
+                          color: 'white'
+                        }}>
+                          Agendar
+                        </Button>
+                      </div>
+                      <Separator className="my-4" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="border rounded-md p-2 text-center">Serviço 1</div>
+                        <div className="border rounded-md p-2 text-center" style={{ 
+                          backgroundColor: form.getValues('primary_color'),
+                          color: 'white'
+                        }}>Serviço 2</div>
+                        <div className="border rounded-md p-2 text-center">Serviço 3</div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="h-4 w-24 rounded" style={{ backgroundColor: form.getValues('secondary_color') }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="plan" className="space-y-4 pt-4">
+                  <FormField
+                    control={form.control}
+                    name="plan"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Plano</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            handlePlanChange(value);
+                          }} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um plano" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {PLANS.map(plan => (
+                              <SelectItem key={plan.value} value={plan.value}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="capitalize">{plan.label}</span>
+                                  <span className="text-muted-foreground">
+                                    R$ {plan.price.toFixed(2)}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {PLANS.find(p => p.value === field.value)?.description || 'Selecione um plano'}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="plan_value"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valor do Plano (R$)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input type="number" step="0.01" className="pl-8" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Valor mensal cobrado da empresa
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="plan_expiry_date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Data de Expiração</FormLabel>
+                        <FormControl>
+                          <div className="border rounded-md p-2">
+                            <DatePicker
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => date < new Date()}
+                              locale={ptBR}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Data em que o plano expirará
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+              </Tabs>
               
-              <div className="space-y-2">
-                <Label htmlFor="secondaryColor">Cor Secundária</Label>
-                <div className="flex space-x-2">
-                  <div 
-                    className="w-8 h-8 rounded-full border"
-                    style={{ backgroundColor: secondaryColor }}
-                  />
-                  <Input 
-                    id="secondaryColor" 
-                    type="color"
-                    value={secondaryColor} 
-                    onChange={(e) => setSecondaryColor(e.target.value)}
-                  />
-                </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <DialogClose asChild>
+                  <Button variant="outline" type="button">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={createMutation.isPending}>
+                  {createMutation.isPending ? 'Criando...' : 'Criar Empresa'}
+                </Button>
               </div>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancelar</Button>
-            </DialogClose>
-            <Button 
-              onClick={handleSaveCompany} 
-              disabled={isSaving || !name || !slug}
-            >
-              {isSaving ? 'Salvando...' : editingCompany ? 'Atualizar' : 'Criar'}
-            </Button>
-          </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
       
-      {/* Plan Management Dialog */}
-      <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
-        <DialogContent>
+      {/* Edit Company Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>
-              Gerenciar Plano
-            </DialogTitle>
-            <DialogDescription>
-              Configure o plano e a data de validade para {editingCompany?.name}
-            </DialogDescription>
+            <DialogTitle>Editar Empresa</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="planType">Tipo de Plano</Label>
-              <select
-                id="planType"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={planType}
-                onChange={(e) => setPlanType(e.target.value)}
-              >
-                <option value="basic">Básico</option>
-                <option value="standard">Padrão</option>
-                <option value="premium">Premium</option>
-                <option value="enterprise">Empresarial</option>
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="planValue">Valor do Plano (R$)</Label>
-              <Input 
-                id="planValue" 
-                type="number"
-                value={planValue} 
-                onChange={(e) => setPlanValue(e.target.value)}
-                placeholder="99.90"
-                min="0"
-                step="0.01"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="planExpiryDate">Data de Expiração</Label>
-              <Input 
-                id="planExpiryDate" 
-                type="date"
-                value={planExpiryDate} 
-                onChange={(e) => setPlanExpiryDate(e.target.value)}
-              />
-              {planExpiryDate && (
-                <p className="text-xs text-muted-foreground">
-                  O plano {new Date(planExpiryDate) > new Date() ? 'expirará' : 'expirou'} em {new Date(planExpiryDate).toLocaleDateString('pt-BR')}
-                </p>
-              )}
-            </div>
-            
-            {editingCompany && editingCompany.plan_expiry_date && new Date(editingCompany.plan_expiry_date) < new Date() && (
-              <div className="rounded-md bg-amber-50 p-4 mt-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertCircle className="h-5 w-5 text-amber-400" aria-hidden="true" />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onEdit)} className="space-y-6">
+              {/* Identical form content as Add Dialog */}
+              <Tabs defaultValue="info">
+                <TabsList className="grid grid-cols-3">
+                  <TabsTrigger value="info">Informações</TabsTrigger>
+                  <TabsTrigger value="appearance">Aparência</TabsTrigger>
+                  <TabsTrigger value="plan">Plano</TabsTrigger>
+                </TabsList>
+                
+                {/* Info tab */}
+                <TabsContent value="info" className="space-y-4 pt-4">
+                  {/* Same fields as Add Dialog */}
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome da Empresa</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Nome da empresa" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="flex items-end gap-2">
+                    <FormField
+                      control={form.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>Slug</FormLabel>
+                          <FormControl>
+                            <Input placeholder="empresa-slug" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            URL única da empresa: app.seudominio.com/{field.value}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={generateRandomSlug}
+                    >
+                      Gerar
+                    </Button>
                   </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-amber-800">Plano Expirado</h3>
-                    <div className="mt-2 text-sm text-amber-700">
-                      <p>
-                        O plano desta empresa já expirou. Os usuários não conseguirão acessar o sistema até que a data de expiração seja atualizada.
-                      </p>
+                  
+                  <FormField
+                    control={form.control}
+                    name="logo_url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL do Logo</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com/logo.png" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          URL da imagem do logo da empresa
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="is_active"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 rounded-md border p-3">
+                        <FormControl>
+                          <Switch 
+                            checked={field.value} 
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-0.5">
+                          <FormLabel>Ativo</FormLabel>
+                          <FormDescription>
+                            Empresa ativa e disponível para acesso
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+                
+                {/* Appearance tab */}
+                <TabsContent value="appearance" className="space-y-4 pt-4">
+                  {/* Same fields as Add Dialog */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="primary_color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cor Primária</FormLabel>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="h-8 w-8 rounded-full border" 
+                              style={{ backgroundColor: field.value }}
+                            />
+                            <FormControl>
+                              <Input type="color" {...field} />
+                            </FormControl>
+                          </div>
+                          <FormDescription>
+                            Cor principal da marca
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="secondary_color"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cor Secundária</FormLabel>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="h-8 w-8 rounded-full border" 
+                              style={{ backgroundColor: field.value }}
+                            />
+                            <FormControl>
+                              <Input type="color" {...field} />
+                            </FormControl>
+                          </div>
+                          <FormDescription>
+                            Cor de destaque secundária
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="mt-6">
+                    <Label>Prévia</Label>
+                    <div className="mt-2 border rounded-md p-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center" style={{ 
+                            backgroundColor: form.getValues('primary_color'),
+                            color: 'white'
+                          }}>
+                            <Building2 className="h-4 w-4" />
+                          </div>
+                          <span className="font-semibold">{form.getValues('name') || 'Nome da Empresa'}</span>
+                        </div>
+                        <Button style={{ 
+                          backgroundColor: form.getValues('primary_color'),
+                          color: 'white'
+                        }}>
+                          Agendar
+                        </Button>
+                      </div>
+                      <Separator className="my-4" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="border rounded-md p-2 text-center">Serviço 1</div>
+                        <div className="border rounded-md p-2 text-center" style={{ 
+                          backgroundColor: form.getValues('primary_color'),
+                          color: 'white'
+                        }}>Serviço 2</div>
+                        <div className="border rounded-md p-2 text-center">Serviço 3</div>
+                      </div>
+                      <div className="mt-4">
+                        <div className="h-4 w-24 rounded" style={{ backgroundColor: form.getValues('secondary_color') }}></div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </TabsContent>
+                
+                {/* Plan tab */}
+                <TabsContent value="plan" className="space-y-4 pt-4">
+                  {/* Same fields as Add Dialog */}
+                  <FormField
+                    control={form.control}
+                    name="plan"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Plano</FormLabel>
+                        <Select 
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            handlePlanChange(value);
+                          }} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um plano" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {PLANS.map(plan => (
+                              <SelectItem key={plan.value} value={plan.value}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="capitalize">{plan.label}</span>
+                                  <span className="text-muted-foreground">
+                                    R$ {plan.price.toFixed(2)}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {PLANS.find(p => p.value === field.value)?.description || 'Selecione um plano'}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="plan_value"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valor do Plano (R$)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input type="number" step="0.01" className="pl-8" {...field} />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Valor mensal cobrado da empresa
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="plan_expiry_date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Data de Expiração</FormLabel>
+                        <FormControl>
+                          <div className="border rounded-md p-2">
+                            <DatePicker
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => date < new Date()}
+                              locale={ptBR}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Data em que o plano expirará
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+              </Tabs>
+              
+              <div className="flex justify-end gap-2 pt-2">
+                <DialogClose asChild>
+                  <Button variant="outline" type="button">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? 'Atualizando...' : 'Atualizar Empresa'}
+                </Button>
               </div>
-            )}
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Desativação</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>
+              Tem certeza que deseja desativar a empresa {selectedCompany?.name}?
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              A empresa será marcada como inativa e não poderá ser acessada pelos usuários.
+              Essa ação pode ser revertida posteriormente.
+            </p>
           </div>
-          
-          <DialogFooter>
+          <div className="flex justify-end gap-2">
             <DialogClose asChild>
               <Button variant="outline">Cancelar</Button>
             </DialogClose>
             <Button 
-              onClick={handleSavePlan} 
-              disabled={isSaving}
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
             >
-              {isSaving ? 'Salvando...' : 'Salvar Plano'}
+              {deleteMutation.isPending ? 'Desativando...' : 'Desativar'}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </SuperAdminLayout>
   );
 };
 
-export default CompaniesPage;
+export default Companies;

@@ -1,111 +1,155 @@
 
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { CheckCircle, Calendar, Home } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { CheckCircle, Calendar, User, Clock, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import NavBar from '@/components/NavBar';
-
-interface AppointmentData {
-  date?: string;
-  time?: string;
-  service?: {
-    name: string;
-    duration: string;
-    price: string;
-  };
-  professionalName?: string;
-  clientName?: string;
-  clientPhone?: string;
-}
+import { Card, CardContent } from '@/components/ui/card';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Appointment, Service } from '@/types/types';
+import { supabase } from '@/integrations/supabase/client';
 
 const AppointmentSuccess = () => {
-  const [appointmentData, setAppointmentData] = useState<AppointmentData | null>(null);
-  const location = useLocation();
-
-  // Animation effect on mount
+  const [searchParams] = useSearchParams();
+  const appointmentId = searchParams.get('id');
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [service, setService] = useState<Service | null>(null);
+  const [loading, setLoading] = useState(true);
+  
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const element = document.getElementById('success-icon');
-      if (element) {
-        element.classList.add('scale-100');
-      }
-    }, 100);
-    
-    // Try to get appointment data from location state
-    if (location.state && location.state.appointmentData) {
-      setAppointmentData(location.state.appointmentData);
-      console.log("Appointment data:", location.state.appointmentData);
-    }
-    
-    return () => clearTimeout(timer);
-  }, [location]);
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <NavBar />
+    const fetchAppointmentDetails = async () => {
+      if (!appointmentId) return;
       
-      <main className="flex-1 container flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md mx-auto text-center animate-fade-in">
-          {/* Success Icon */}
-          <div 
-            id="success-icon"
-            className="w-24 h-24 mx-auto mb-8 bg-primary/10 rounded-full flex items-center justify-center transform scale-50 transition-transform duration-700 ease-out"
-          >
-            <CheckCircle className="h-12 w-12 text-primary" />
+      try {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            professionals:professional_id (name),
+            services:service_id (name, duration, price, description),
+            slots:slot_id (start_time, end_time)
+          `)
+          .eq('id', appointmentId)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching appointment details:', error);
+          return;
+        }
+        
+        setAppointment(data);
+        setService(data.services);
+      } catch (err) {
+        console.error('Unexpected error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAppointmentDetails();
+  }, [appointmentId]);
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary/10 to-background p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md mx-auto">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p>Carregando detalhes do agendamento...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (!appointment || !appointment.slots) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary/10 to-background p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md mx-auto">
+          <CardContent className="p-6">
+            <div className="text-center text-muted-foreground">
+              <p>Não foi possível encontrar os detalhes do agendamento.</p>
+              <Button asChild className="mt-4">
+                <Link to="/">Voltar para o início</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  const appointmentDate = appointment.slots.start_time ? parseISO(appointment.slots.start_time) : new Date();
+  const formattedDate = format(appointmentDate, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const formattedTime = format(appointmentDate, "HH:mm");
+  
+  const serviceName = appointment.services?.name || "Serviço não especificado";
+  const serviceDescription = appointment.services?.description || "";
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-primary/10 to-background p-4 flex items-center justify-center">
+      <Card className="w-full max-w-md mx-auto">
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center space-y-4 mb-6 text-center">
+            <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+              <CheckCircle className="h-10 w-10 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold">Agendamento Confirmado!</h1>
           </div>
           
-          {/* Success Message */}
-          <h1 className="text-3xl font-bold mb-4">Agendamento Confirmado!</h1>
-          
-          {/* Appointment Details Card */}
-          <div className="bg-card border rounded-lg p-6 mb-8 animate-slide-up">
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mr-4">
-                  <Calendar className="h-5 w-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="text-muted-foreground text-sm">Data e Hora</p>
-                  <p className="font-medium">
-                    {appointmentData?.date || "Data não informada"} - {appointmentData?.time || "Horário não informado"}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="border-t my-4 pt-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Serviço</span>
-                  <span className="font-medium">{appointmentData?.service?.name || "Serviço não especificado"}</span>
-                </div>
-                <div className="flex justify-between text-sm mt-2">
-                  <span className="text-muted-foreground">Duração</span>
-                  <span>{appointmentData?.service?.duration || "Não informada"}</span>
-                </div>
-                <div className="flex justify-between text-sm mt-2">
-                  <span className="text-muted-foreground">Valor</span>
-                  <span className="font-medium">{appointmentData?.service?.price || "Não informado"}</span>
-                </div>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-lg font-medium text-muted-foreground">Data e Hora</h2>
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <p className="capitalize">{formattedDate} - {formattedTime}</p>
               </div>
             </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-lg font-medium text-muted-foreground">Serviço</h2>
+              <div className="flex items-center space-x-2">
+                <Scissors className="h-5 w-5 text-primary" />
+                <p>{serviceName}</p>
+              </div>
+              {serviceDescription && (
+                <p className="text-sm text-muted-foreground ml-7">{serviceDescription}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-lg font-medium text-muted-foreground">Profissional</h2>
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-primary" />
+                <p>{appointment.professionals?.name || "Profissional não especificado"}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-lg font-medium text-muted-foreground">Cliente</h2>
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-primary" />
+                <p>{appointment.client_name}</p>
+              </div>
+              <div className="flex items-center space-x-2 ml-7">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Chegue com 10 minutos de antecedência</p>
+              </div>
+            </div>
+            
+            <div className="pt-4">
+              <Button asChild className="w-full">
+                <Link to="/appointments">Ver Meus Agendamentos</Link>
+              </Button>
+            </div>
+            
+            <div className="text-center text-xs text-muted-foreground pt-2">
+              <p>Para cancelar ou reagendar, entre em contato conosco.</p>
+            </div>
           </div>
-          
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button asChild className="flex-1">
-              <Link to="/appointments">
-                <Calendar className="mr-2 h-4 w-4" />
-                Ver Meus Agendamentos
-              </Link>
-            </Button>
-            <Button variant="outline" asChild className="flex-1">
-              <Link to="/">
-                <Home className="mr-2 h-4 w-4" />
-                Voltar ao Início
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </main>
+        </CardContent>
+      </Card>
     </div>
   );
 };

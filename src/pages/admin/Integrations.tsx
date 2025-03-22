@@ -1,493 +1,482 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState } from 'react';
+import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowRightFromLine, Link as LinkIcon, Code, Check, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import { 
+  fetchWebhookConfigurations, 
+  fetchWebhookLogs,
+  createWebhookConfiguration,
+  updateWebhookConfiguration,
+  testWebhook
+} from '@/services/api';
 import { WebhookConfiguration, WebhookLog } from '@/types/webhook';
+import { format, parseISO } from 'date-fns';
 
-import {
-  ArrowRight,
-  CheckCircle2,
-  Clock,
-  Globe,
-  RefreshCcw,
-  Plug,
-  Send,
-  XCircle,
-  Code,
-  Loader2,
-  Settings
-} from 'lucide-react';
-
-const IntegrationsPage = () => {
-  const navigate = useNavigate();
+const Integrations = () => {
+  const queryClient = useQueryClient();
   const [webhookUrl, setWebhookUrl] = useState('');
-  const [webhookActive, setWebhookActive] = useState(true);
-  const [webhookEventType, setWebhookEventType] = useState('appointment_created');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSendingTest, setIsSendingTest] = useState(false);
-  const [webhookConfigs, setWebhookConfigs] = useState<WebhookConfiguration[]>([]);
-  const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([]);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Fetch webhook configurations
-      const { data: webhookData, error: webhookError } = await supabase
-        .from('webhook_configurations')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (webhookError) throw webhookError;
-      
-      // Fetch webhook logs
-      const { data: logsData, error: logsError } = await supabase
-        .from('webhook_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      
-      if (logsError) throw logsError;
-      
-      setWebhookConfigs(webhookData as WebhookConfiguration[]);
-      setWebhookLogs(logsData as WebhookLog[]);
-      
-      // If there's a webhook config, set the form values
-      if (webhookData && webhookData.length > 0) {
-        setWebhookUrl(webhookData[0].url);
-        setWebhookActive(webhookData[0].is_active);
-        setWebhookEventType(webhookData[0].event_type || 'appointment_created');
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Erro ao carregar dados');
-    } finally {
-      setIsLoading(false);
+  const [isActive, setIsActive] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+  const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfiguration | null>(null);
+  const [selectedEventType, setSelectedEventType] = useState('appointment_created');
+  const [testEventType, setTestEventType] = useState('appointment_created');
+  const [isTesting, setIsTesting] = useState(false);
+  
+  // Fetch webhook configurations
+  const { data: webhookConfigurations = [], isLoading: isLoadingConfigurations } = useQuery({
+    queryKey: ['webhook-configurations'],
+    queryFn: fetchWebhookConfigurations
+  });
+  
+  // Fetch webhook logs
+  const { data: webhookLogs = [], isLoading: isLoadingLogs } = useQuery({
+    queryKey: ['webhook-logs'],
+    queryFn: fetchWebhookLogs
+  });
+  
+  // Create webhook configuration mutation
+  const createMutation = useMutation({
+    mutationFn: (webhook: Partial<WebhookConfiguration>) => createWebhookConfiguration(webhook),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-configurations'] });
+      setIsAddDialogOpen(false);
+      setWebhookUrl('');
+      toast.success('Webhook configurado com sucesso');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao configurar webhook: ${error.message}`);
     }
-  };
-
-  const handleSaveWebhook = async () => {
-    if (!webhookUrl) {
-      toast.error('Por favor, informe a URL do webhook');
+  });
+  
+  // Update webhook active status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => 
+      updateWebhookConfiguration(id, { is_active: isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-configurations'] });
+      toast.success('Status do webhook atualizado');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar status: ${error.message}`);
+    }
+  });
+  
+  // Test webhook mutation
+  const testWebhookMutation = useMutation({
+    mutationFn: ({ url, eventType }: { url: string; eventType: string }) => testWebhook(url, eventType),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-logs'] });
+      
+      if (data.success) {
+        toast.success('Webhook enviado com sucesso');
+      } else {
+        toast.error(`Erro no envio: ${data.message}`);
+      }
+      
+      setIsTesting(false);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao testar webhook: ${error.message}`);
+      setIsTesting(false);
+    }
+  });
+  
+  const handleAddWebhook = () => {
+    if (!webhookUrl.trim()) {
+      toast.error('Insira uma URL válida');
       return;
     }
     
-    try {
-      setIsSaving(true);
-      
-      // URL validation
-      try {
-        new URL(webhookUrl);
-      } catch (e) {
-        toast.error('URL inválida');
-        setIsSaving(false);
-        return;
-      }
-      
-      const webhookData = {
-        url: webhookUrl,
-        is_active: webhookActive,
-        event_type: webhookEventType
-      };
-      
-      if (webhookConfigs.length > 0) {
-        // Update existing webhook
-        const { error } = await supabase
-          .from('webhook_configurations')
-          .update(webhookData)
-          .eq('id', webhookConfigs[0].id);
-        
-        if (error) throw error;
-        
-        toast.success('Webhook atualizado com sucesso');
-      } else {
-        // Create new webhook
-        const { error } = await supabase
-          .from('webhook_configurations')
-          .insert([webhookData]);
-        
-        if (error) throw error;
-        
-        toast.success('Webhook configurado com sucesso');
-      }
-      
-      fetchData();
-    } catch (error) {
-      console.error('Error saving webhook:', error);
-      toast.error('Erro ao salvar webhook');
-    } finally {
-      setIsSaving(false);
+    createMutation.mutate({
+      url: webhookUrl,
+      is_active: isActive,
+      event_type: selectedEventType
+    });
+  };
+  
+  const handleToggleStatus = (webhook: WebhookConfiguration) => {
+    updateStatusMutation.mutate({
+      id: webhook.id,
+      isActive: !webhook.is_active
+    });
+  };
+  
+  const handleTestWebhook = () => {
+    if (!selectedWebhook) return;
+    
+    setIsTesting(true);
+    testWebhookMutation.mutate({
+      url: selectedWebhook.url,
+      eventType: testEventType
+    });
+  };
+  
+  const openTestDialog = (webhook: WebhookConfiguration) => {
+    setSelectedWebhook(webhook);
+    setTestEventType(webhook.event_type || 'appointment_created');
+    setIsTestDialogOpen(true);
+  };
+  
+  // Get status badge colors
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'success':
+        return 'bg-green-100 text-green-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'skipped':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
   
-  const handleSendTestWebhook = async () => {
-    if (!webhookUrl) {
-      toast.error('Por favor, configure a URL do webhook primeiro');
-      return;
-    }
-    
-    try {
-      setIsSendingTest(true);
-      
-      const response = await fetch('/api/test-webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: webhookUrl,
-          event_type: webhookEventType,
-          payload: {
-            event: webhookEventType,
-            test: true,
-            timestamp: new Date().toISOString()
-          }
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao enviar webhook de teste');
-      }
-      
-      toast.success('Webhook de teste enviado com sucesso');
-      
-      // Refresh logs after a delay
-      setTimeout(() => {
-        fetchData();
-      }, 1000);
-      
-    } catch (error: any) {
-      console.error('Error sending test webhook:', error);
-      toast.error(`Erro ao enviar webhook de teste: ${error.message}`);
-    } finally {
-      setIsSendingTest(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }).format(date);
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Sucesso</Badge>;
+        return <Check className="h-4 w-4" />;
       case 'failed':
-        return <Badge variant="destructive">Falha</Badge>;
+        return <X className="h-4 w-4" />;
       case 'pending':
-        return <Badge variant="outline" className="border-amber-500 text-amber-500">Pendente</Badge>;
+        return <RefreshCw className="h-4 w-4" />;
+      case 'skipped':
+        return <AlertTriangle className="h-4 w-4" />;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return null;
     }
   };
 
-  const getEventTypeName = (eventType: string) => {
-    switch (eventType) {
-      case 'appointment_created':
-        return 'Agendamento Criado';
-      case 'appointment_updated':
-        return 'Agendamento Atualizado';
-      case 'appointment_cancelled':
-        return 'Agendamento Cancelado';
-      case 'appointment_completed':
-        return 'Agendamento Concluído';
-      default:
-        return eventType;
-    }
+  const eventTypeOptions = [
+    { value: 'appointment_created', label: 'Agendamento Criado' },
+    { value: 'appointment_cancelled', label: 'Agendamento Cancelado' },
+    { value: 'appointment_completed', label: 'Agendamento Concluído' },
+    { value: 'professional_created', label: 'Profissional Criado' },
+    { value: 'service_created', label: 'Serviço Criado' }
+  ];
+  
+  const getEventTypeLabel = (value: string) => {
+    const option = eventTypeOptions.find(opt => opt.value === value);
+    return option ? option.label : value;
   };
-
+  
   return (
     <AdminLayout>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Integrações</h1>
-        </div>
+        <h1 className="text-2xl font-bold mb-6">Integrações</h1>
         
-        <Tabs defaultValue="webhooks" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="webhooks" className="flex items-center">
-              <Plug className="mr-2 h-4 w-4" />
-              Webhooks
-            </TabsTrigger>
-            <TabsTrigger value="api" className="flex items-center">
-              <Code className="mr-2 h-4 w-4" />
-              API
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center">
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
-            </TabsTrigger>
+        <Tabs defaultValue="webhooks">
+          <TabsList className="mb-6">
+            <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+            <TabsTrigger value="api">API</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="webhooks" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Globe className="mr-2 h-5 w-5" />
-                  Configuração de Webhook
-                </CardTitle>
-                <CardDescription>
-                  Configure um endpoint para receber notificações em tempo real
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="webhook-url">URL do Webhook</Label>
-                  <Input
-                    id="webhook-url"
-                    placeholder="https://seu-endpoint.exemplo.com/webhook"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Uma URL válida para onde os eventos serão enviados
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="webhook-event">Evento de Teste</Label>
-                  <select
-                    id="webhook-event"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={webhookEventType}
-                    onChange={(e) => setWebhookEventType(e.target.value)}
-                  >
-                    <option value="appointment_created">Agendamento Criado</option>
-                    <option value="appointment_updated">Agendamento Atualizado</option>
-                    <option value="appointment_cancelled">Agendamento Cancelado</option>
-                    <option value="appointment_completed">Agendamento Concluído</option>
-                  </select>
-                  <p className="text-sm text-muted-foreground">
-                    Selecione o tipo de evento para o teste
-                  </p>
-                </div>
-                
-                <div className="flex items-center space-x-2 pt-2">
-                  <Switch
-                    id="webhook-active"
-                    checked={webhookActive}
-                    onCheckedChange={setWebhookActive}
-                  />
-                  <Label htmlFor="webhook-active">Webhook Ativo</Label>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button
-                  variant="outline"
-                  onClick={() => handleSendTestWebhook()}
-                  disabled={isSendingTest || !webhookUrl}
-                >
-                  {isSendingTest ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Enviar Teste
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={() => handleSaveWebhook()}
-                  disabled={isSaving || !webhookUrl}
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Salvar Configuração'
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Histórico de Eventos</CardTitle>
-                <CardDescription>
-                  Registros dos últimos webhooks enviados
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+          <TabsContent value="webhooks">
+            <div className="grid gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div>
+                    <CardTitle>Webhooks</CardTitle>
+                    <CardDescription>
+                      Conecte sua aplicação a eventos do sistema
+                    </CardDescription>
                   </div>
-                ) : webhookLogs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">
-                      Nenhum evento de webhook foi registrado ainda
-                    </p>
-                  </div>
-                ) : (
-                  <div className="relative overflow-x-auto">
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    Adicionar Webhook
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingConfigurations ? (
+                    <div className="text-center py-4">Carregando configurações...</div>
+                  ) : webhookConfigurations.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <LinkIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>Nenhum webhook configurado.</p>
+                      <p className="text-sm mt-2">
+                        Configure webhooks para receber notificações em tempo real quando eventos ocorrerem no sistema.
+                      </p>
+                    </div>
+                  ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Data</TableHead>
+                          <TableHead>URL</TableHead>
                           <TableHead>Evento</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Tentativas</TableHead>
-                          <TableHead className="w-[100px]"></TableHead>
+                          <TableHead>Criado em</TableHead>
+                          <TableHead className="w-[100px]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {webhookLogs.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="font-medium">
-                              {formatDate(log.created_at)}
+                        {webhookConfigurations.map((webhook) => (
+                          <TableRow key={webhook.id}>
+                            <TableCell className="font-medium truncate max-w-xs">
+                              {webhook.url}
                             </TableCell>
                             <TableCell>
-                              {getEventTypeName(log.event_type)}
+                              {getEventTypeLabel(webhook.event_type)}
                             </TableCell>
                             <TableCell>
-                              {getStatusBadge(log.status)}
+                              <div className="flex items-center space-x-2">
+                                <Switch 
+                                  checked={webhook.is_active} 
+                                  onCheckedChange={() => handleToggleStatus(webhook)}
+                                  disabled={updateStatusMutation.isPending}
+                                />
+                                <span className={webhook.is_active ? 'text-green-600' : 'text-muted-foreground'}>
+                                  {webhook.is_active ? 'Ativo' : 'Inativo'}
+                                </span>
+                              </div>
                             </TableCell>
-                            <TableCell>{log.attempts}</TableCell>
+                            <TableCell>
+                              {webhook.created_at && format(new Date(webhook.created_at), 'dd/MM/yyyy HH:mm')}
+                            </TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  console.log('Log details:', log);
-                                  toast.info('Detalhes do log no console');
-                                }}
+                                className="h-8 w-8 p-0"
+                                onClick={() => openTestDialog(webhook)}
+                                title="Testar Webhook"
                               >
-                                Detalhes
+                                <ArrowRightFromLine className="h-4 w-4" />
                               </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto"
-                  onClick={() => fetchData()}
-                >
-                  <RefreshCcw className="mr-2 h-4 w-4" />
-                  Atualizar
-                </Button>
-              </CardFooter>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Logs de Webhooks</CardTitle>
+                  <CardDescription>
+                    Histórico de envios de webhooks
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingLogs ? (
+                    <div className="text-center py-4">Carregando logs...</div>
+                  ) : webhookLogs.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Code className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>Nenhum log de webhook disponível.</p>
+                      <p className="text-sm mt-2">
+                        Os logs aparecerão aqui quando webhooks forem acionados.
+                      </p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Evento</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Tentativas</TableHead>
+                          <TableHead>Data</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {webhookLogs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell>{getEventTypeLabel(log.event_type)}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={`${getStatusColor(log.status)} flex items-center gap-1`}>
+                                {getStatusIcon(log.status)}
+                                <span className="ml-1 capitalize">{log.status}</span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{log.attempts}</TableCell>
+                            <TableCell>
+                              {log.created_at && format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss')}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
           
-          <TabsContent value="api" className="space-y-6">
+          <TabsContent value="api">
             <Card>
               <CardHeader>
-                <CardTitle>API de Integração</CardTitle>
+                <CardTitle>API</CardTitle>
                 <CardDescription>
-                  Acesse nossa API para integrar com outros sistemas
+                  Informações para integrar com a API do sistema
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="rounded-md bg-muted p-4">
+                <div className="space-y-2">
+                  <Label>URL Base</Label>
                   <div className="flex">
-                    <div className="flex-shrink-0">
-                      <ArrowRight className="h-5 w-5 text-primary" aria-hidden="true" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium">Documentação em Breve</h3>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        <p>
-                          Estamos trabalhando na documentação da API. Em breve você poderá integrar seu sistema diretamente com nossa plataforma.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações de Integração</CardTitle>
-                <CardDescription>
-                  Gerencie as configurações gerais de integração
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border-b pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">Integração de Notificações</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Receba notificações de agendamentos por email
-                      </p>
-                    </div>
-                    <Switch id="notification-integration" defaultChecked={true} />
+                    <Input readOnly value="https://api.example.com/v1" />
+                    <Button variant="ghost" className="ml-2">
+                      <LinkIcon className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 
-                <div className="border-b pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">Integração de Calendário</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Sincronize com Google Agenda (em breve)
-                      </p>
-                    </div>
-                    <Switch id="calendar-integration" disabled />
+                <div className="space-y-2">
+                  <Label>Autenticação</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Para autenticar suas requisições, use o cabeçalho <code>Authorization</code> com um token JWT.
+                  </p>
+                  <div className="bg-secondary p-2 rounded-md">
+                    <code className="text-xs">
+                      Authorization: Bearer seu_token_jwt
+                    </code>
                   </div>
                 </div>
                 
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">Integração de Pagamentos</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Processe pagamentos online (em breve)
-                      </p>
-                    </div>
-                    <Switch id="payment-integration" disabled />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Documentação</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Consulte nossa documentação completa para mais informações sobre como utilizar a API.
+                  </p>
+                  <Button variant="outline" className="w-full">
+                    Acessar Documentação
+                  </Button>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button className="ml-auto">Salvar Configurações</Button>
-              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Add Webhook Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Webhook</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="webhook-url">URL do Webhook</Label>
+              <Input 
+                id="webhook-url" 
+                placeholder="https://" 
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="event-type">Tipo de Evento</Label>
+              <Select 
+                value={selectedEventType} 
+                onValueChange={setSelectedEventType}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o evento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {eventTypeOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Este webhook será acionado quando o evento ocorrer.
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="is-active" 
+                checked={isActive} 
+                onCheckedChange={setIsActive}
+              />
+              <Label htmlFor="is-active">Ativar Webhook</Label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button 
+              onClick={handleAddWebhook}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? 'Configurando...' : 'Configurar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Test Webhook Dialog */}
+      <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Testar Webhook</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {selectedWebhook && (
+              <>
+                <div className="space-y-2">
+                  <Label>URL</Label>
+                  <p className="text-sm font-medium">{selectedWebhook.url}</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="test-event-type">Tipo de Evento</Label>
+                  <Select 
+                    value={testEventType} 
+                    onValueChange={setTestEventType}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o evento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventTypeOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Selecione o tipo de evento para o teste.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button 
+              onClick={handleTestWebhook}
+              disabled={isTesting}
+            >
+              {isTesting ? 'Enviando...' : 'Enviar Teste'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
 
-export default IntegrationsPage;
+export default Integrations;

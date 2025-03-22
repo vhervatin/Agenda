@@ -105,6 +105,51 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          plan: string | null
+          plan_expiry_date: string | null
+          plan_value: number | null
+          primary_color: string | null
+          secondary_color: string | null
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          plan?: string | null
+          plan_expiry_date?: string | null
+          plan_value?: number | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          plan?: string | null
+          plan_expiry_date?: string | null
+          plan_value?: number | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       professional_services: {
         Row: {
           id: string
@@ -223,6 +268,7 @@ export type Database = {
           id: string
           name: string
           role: Database["public"]["Enums"]["user_role"]
+          tipo_usuario: string | null
           updated_at: string | null
         }
         Insert: {
@@ -232,6 +278,7 @@ export type Database = {
           id?: string
           name: string
           role: Database["public"]["Enums"]["user_role"]
+          tipo_usuario?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -241,9 +288,89 @@ export type Database = {
           id?: string
           name?: string
           role?: Database["public"]["Enums"]["user_role"]
+          tipo_usuario?: string | null
           updated_at?: string | null
         }
         Relationships: []
+      }
+      webhook_configurations: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          event_type: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          event_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          event_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_logs: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          event_type: string
+          id: string
+          payload: Json | null
+          status: string | null
+          updated_at: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          payload?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          status?: string | null
+          updated_at?: string | null
+          webhook_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_logs_webhook_id_fkey"
+            columns: ["webhook_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
