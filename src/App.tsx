@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import AppointmentSuccess from "./pages/AppointmentSuccess";
@@ -16,6 +16,8 @@ import AdminServices from "./pages/admin/Services";
 import AdminSchedule from "./pages/admin/Schedule";
 import AdminAppointments from "./pages/admin/Appointments";
 import AdminSettings from "./pages/admin/Settings";
+import AdminIntegrations from "./pages/admin/Integrations";
+import SuperAdminDashboard from "./pages/superadmin/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +45,11 @@ const App = () => (
           <Route path="/admin/schedule" element={<AdminSchedule />} />
           <Route path="/admin/appointments" element={<AdminAppointments />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/integrations" element={<AdminIntegrations />} />
+          
+          {/* SuperAdmin Routes */}
+          <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
+          <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
           
           {/* Calendar route will redirect to appointments for now */}
           <Route path="/calendar" element={<Appointments />} />

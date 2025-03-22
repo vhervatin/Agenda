@@ -21,16 +21,44 @@ const Login = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        navigate('/admin/dashboard');
+        const { data: userData } = await supabase
+          .from('users')
+          .select('tipo_usuario')
+          .eq('auth_id', session.user.id)
+          .single();
+        
+        if (userData && userData.tipo_usuario === 'superadmin') {
+          navigate('/superadmin/dashboard');
+        } else {
+          navigate('/admin/dashboard');
+        }
       }
     };
     
     checkSession();
     
     // Set up the auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        navigate('/admin/dashboard');
+        try {
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('tipo_usuario')
+            .eq('auth_id', session.user.id)
+            .single();
+          
+          if (error) throw error;
+          
+          if (userData && userData.tipo_usuario === 'superadmin') {
+            navigate('/superadmin/dashboard');
+          } else {
+            navigate('/admin/dashboard');
+          }
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+          // Default to admin dashboard if we can't determine the role
+          navigate('/admin/dashboard');
+        }
       }
     });
     

@@ -1,11 +1,27 @@
 
-import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle, Calendar, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NavBar from '@/components/NavBar';
 
+interface AppointmentData {
+  date?: string;
+  time?: string;
+  service?: {
+    name: string;
+    duration: string;
+    price: string;
+  };
+  professionalName?: string;
+  clientName?: string;
+  clientPhone?: string;
+}
+
 const AppointmentSuccess = () => {
+  const [appointmentData, setAppointmentData] = useState<AppointmentData | null>(null);
+  const location = useLocation();
+
   // Animation effect on mount
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -15,8 +31,13 @@ const AppointmentSuccess = () => {
       }
     }, 100);
     
+    // Try to get appointment data from location state
+    if (location.state && location.state.appointmentData) {
+      setAppointmentData(location.state.appointmentData);
+    }
+    
     return () => clearTimeout(timer);
-  }, []);
+  }, [location]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -44,22 +65,24 @@ const AppointmentSuccess = () => {
                 </div>
                 <div className="text-left">
                   <p className="text-muted-foreground text-sm">Data e Hora</p>
-                  <p className="font-medium">Segunda, 12 de Junho - 14:30</p>
+                  <p className="font-medium">
+                    {appointmentData?.date || "Segunda, 12 de Junho"} - {appointmentData?.time || "14:30"}
+                  </p>
                 </div>
               </div>
               
               <div className="border-t my-4 pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Serviço</span>
-                  <span className="font-medium">Corte de Cabelo</span>
+                  <span className="font-medium">{appointmentData?.service?.name || "Corte de Cabelo"}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-muted-foreground">Duração</span>
-                  <span>45 minutos</span>
+                  <span>{appointmentData?.service?.duration || "45 minutos"}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-muted-foreground">Valor</span>
-                  <span className="font-medium">R$ 80,00</span>
+                  <span className="font-medium">{appointmentData?.service?.price || "R$ 80,00"}</span>
                 </div>
               </div>
             </div>

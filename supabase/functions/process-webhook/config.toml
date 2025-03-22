@@ -1,0 +1,5 @@
+
+project_id = "ddsdidxdwdbqdoyczhyq"
+compute_service = "functions"
+[functions.process-webhook]
+verify_jwt = false
