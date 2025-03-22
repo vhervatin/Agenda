@@ -1,5 +1,6 @@
 
-// Fix only the problematic functions with type errors
+import { supabase } from "@/integrations/supabase/client";
+import { Professional, Service, TimeSlot, Appointment, User, WebhookConfiguration, Company } from "@/types/types";
 
 // Fix the createWebhooks function to properly handle array inserts
 export const createWebhooks = async (webhooks: Partial<WebhookConfiguration>[]) => {
@@ -12,8 +13,9 @@ export const createWebhooks = async (webhooks: Partial<WebhookConfiguration>[]) 
     }
     
     const { data, error } = await supabase
-      .from('webhooks')
-      .insert(validWebhooks);
+      .from('webhook_configurations')
+      .insert(validWebhooks)
+      .select();
       
     if (error) throw error;
     return data;
@@ -35,7 +37,8 @@ export const createCompanies = async (companies: Partial<Company>[]) => {
     
     const { data, error } = await supabase
       .from('companies')
-      .insert(validCompanies);
+      .insert(validCompanies)
+      .select();
       
     if (error) throw error;
     return data;
@@ -57,7 +60,8 @@ export const createUsers = async (users: Partial<User>[]) => {
     
     const { data, error } = await supabase
       .from('users')
-      .insert(validUsers);
+      .insert(validUsers)
+      .select();
       
     if (error) throw error;
     return data;
@@ -100,4 +104,559 @@ export const getUserByAuth = async (authId: string): Promise<User | null> => {
     console.error('Error fetching user by auth id:', error);
     throw error;
   }
+};
+
+// Add additional API functions needed by the application
+// Professionals
+export const fetchProfessionals = async (): Promise<Professional[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .select('*')
+      .order('name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching professionals:', error);
+    throw error;
+  }
+};
+
+export const createProfessional = async (professional: Partial<Professional>): Promise<Professional> => {
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .insert(professional)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating professional:', error);
+    throw error;
+  }
+};
+
+export const updateProfessional = async (id: string, professional: Partial<Professional>): Promise<Professional> => {
+  try {
+    const { data, error } = await supabase
+      .from('professionals')
+      .update(professional)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating professional:', error);
+    throw error;
+  }
+};
+
+export const deleteProfessional = async (id: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('professionals')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting professional:', error);
+    throw error;
+  }
+};
+
+// Services
+export const fetchServices = async (): Promise<Service[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .order('name', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching services:', error);
+    throw error;
+  }
+};
+
+export const createService = async (service: Partial<Service>): Promise<Service> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .insert(service)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating service:', error);
+    throw error;
+  }
+};
+
+export const updateService = async (id: string, service: Partial<Service>): Promise<Service> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .update(service)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating service:', error);
+    throw error;
+  }
+};
+
+export const deleteService = async (id: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('services')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    throw error;
+  }
+};
+
+// Professional Services
+export const fetchProfessionalServices = async (professionalId: string): Promise<Service[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('professional_services')
+      .select('service_id')
+      .eq('professional_id', professionalId);
+      
+    if (error) throw error;
+    
+    if (!data || data.length === 0) return [];
+    
+    const serviceIds = data.map(item => item.service_id);
+    
+    const { data: services, error: servicesError } = await supabase
+      .from('services')
+      .select('*')
+      .in('id', serviceIds)
+      .order('name', { ascending: true });
+      
+    if (servicesError) throw servicesError;
+    
+    return services || [];
+  } catch (error) {
+    console.error('Error fetching professional services:', error);
+    throw error;
+  }
+};
+
+export const associateProfessionalService = async (professionalId: string, serviceId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('professional_services')
+      .insert({ professional_id: professionalId, service_id: serviceId });
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error associating professional with service:', error);
+    throw error;
+  }
+};
+
+export const dissociateProfessionalService = async (professionalId: string, serviceId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('professional_services')
+      .delete()
+      .eq('professional_id', professionalId)
+      .eq('service_id', serviceId);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error dissociating professional from service:', error);
+    throw error;
+  }
+};
+
+// Available Slots
+export const fetchAvailableSlots = async (professionalId: string, date: Date): Promise<TimeSlot[]> => {
+  try {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const { data, error } = await supabase
+      .from('available_slots')
+      .select('*')
+      .eq('professional_id', professionalId)
+      .gte('start_time', startOfDay.toISOString())
+      .lte('start_time', endOfDay.toISOString())
+      .eq('is_available', true)
+      .order('start_time', { ascending: true });
+      
+    if (error) throw error;
+    
+    // Transform to TimeSlot format
+    return (data || []).map(slot => ({
+      id: slot.id,
+      time: new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      available: slot.is_available,
+      start_time: slot.start_time,
+      end_time: slot.end_time
+    }));
+  } catch (error) {
+    console.error('Error fetching available slots:', error);
+    throw error;
+  }
+};
+
+export const fetchAllSlotsForProfessional = async (professionalId: string, date?: Date): Promise<any[]> => {
+  try {
+    let query = supabase
+      .from('available_slots')
+      .select('*')
+      .eq('professional_id', professionalId)
+      .order('start_time', { ascending: true });
+    
+    if (date) {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      query = query
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString());
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching all slots:', error);
+    throw error;
+  }
+};
+
+export const createAvailableSlot = async (slot: any): Promise<any> => {
+  try {
+    const { data, error } = await supabase
+      .from('available_slots')
+      .insert(slot)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating available slot:', error);
+    throw error;
+  }
+};
+
+export const createAvailableSlotsBulk = async (slots: any[]): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('available_slots')
+      .insert(slots)
+      .select();
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error creating available slots in bulk:', error);
+    throw error;
+  }
+};
+
+export const deleteAvailableSlot = async (id: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('available_slots')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting available slot:', error);
+    throw error;
+  }
+};
+
+// Appointments
+export const createAppointment = async (
+  professionalId: string,
+  serviceId: string,
+  slotId: string,
+  clientName: string,
+  clientPhone: string
+): Promise<{ success: boolean; appointmentId?: string }> => {
+  try {
+    // Prepare appointment data
+    const appointmentData = {
+      professional_id: professionalId,
+      service_id: serviceId,
+      slot_id: slotId,
+      client_name: clientName,
+      client_phone: clientPhone,
+      status: 'confirmed'
+    };
+    
+    // Create the appointment
+    const { data, error } = await supabase
+      .from('appointments')
+      .insert(appointmentData)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    // Mark the slot as unavailable
+    const { error: slotError } = await supabase
+      .from('available_slots')
+      .update({ is_available: false })
+      .eq('id', slotId);
+      
+    if (slotError) throw slotError;
+    
+    return { success: true, appointmentId: data.id };
+  } catch (error) {
+    console.error('Error creating appointment:', error);
+    return { success: false };
+  }
+};
+
+export const fetchAppointments = async (): Promise<Appointment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        professionals:professional_id (id, name, photo_url),
+        services:service_id (id, name, duration, price),
+        slots:slot_id (id, start_time, end_time)
+      `)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    throw error;
+  }
+};
+
+export const fetchAppointmentsByPhone = async (phone: string): Promise<Appointment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        professionals:professional_id (id, name, photo_url),
+        services:service_id (id, name, duration, price),
+        slots:slot_id (id, start_time, end_time)
+      `)
+      .eq('client_phone', phone)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching appointments by phone:', error);
+    throw error;
+  }
+};
+
+export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed'): Promise<void> => {
+  try {
+    // Get the current appointment to find the slot_id
+    const { data: appointment, error: fetchError } = await supabase
+      .from('appointments')
+      .select('slot_id, status')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Update the appointment status
+    const { error } = await supabase
+      .from('appointments')
+      .update({ status })
+      .eq('id', id);
+      
+    if (error) throw error;
+    
+    // If the appointment is being cancelled, make the slot available again
+    if (status === 'cancelled' && appointment.status !== 'cancelled') {
+      const { error: slotError } = await supabase
+        .from('available_slots')
+        .update({ is_available: true })
+        .eq('id', appointment.slot_id);
+        
+      if (slotError) throw slotError;
+    }
+  } catch (error) {
+    console.error('Error updating appointment status:', error);
+    throw error;
+  }
+};
+
+// Webhooks
+export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching webhook configurations:', error);
+    throw error;
+  }
+};
+
+export const fetchWebhookLogs = async (): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('webhook_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching webhook logs:', error);
+    throw error;
+  }
+};
+
+export const createWebhookConfiguration = async (url: string, eventType: string): Promise<WebhookConfiguration> => {
+  try {
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .insert({ url, event_type: eventType })
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating webhook configuration:', error);
+    throw error;
+  }
+};
+
+export const updateWebhookConfiguration = async (id: string, updates: Partial<WebhookConfiguration>): Promise<WebhookConfiguration> => {
+  try {
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating webhook configuration:', error);
+    throw error;
+  }
+};
+
+export const testWebhook = async (webhookId: string): Promise<{ success: boolean; message?: string }> => {
+  try {
+    // Get the webhook URL and event type
+    const { data: webhook, error: fetchError } = await supabase
+      .from('webhook_configurations')
+      .select('url, event_type')
+      .eq('id', webhookId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Call the test-webhook edge function
+    const { data, error } = await supabase.functions.invoke('test-webhook', {
+      body: { url: webhook.url, event_type: webhook.event_type }
+    });
+    
+    if (error) throw error;
+    
+    return { success: true, message: 'Webhook tested successfully' };
+  } catch (error) {
+    console.error('Error testing webhook:', error);
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+  }
+};
+
+// Companies
+export const fetchCompanies = async (): Promise<Company[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching companies:', error);
+    throw error;
+  }
+};
+
+export const createCompany = async (company: Partial<Company>): Promise<Company> => {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .insert(company)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating company:', error);
+    throw error;
+  }
+};
+
+export const updateCompany = async (id: string, company: Partial<Company>): Promise<Company> => {
+  try {
+    const { data, error } = await supabase
+      .from('companies')
+      .update(company)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating company:', error);
+    throw error;
+  }
+};
+
+// Use instead of fetchUserByAuthId in Dashboard.tsx
+export const fetchUserByAuthId = async (authId: string): Promise<User | null> => {
+  return getUserByAuth(authId);
 };
