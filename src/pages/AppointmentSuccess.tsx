@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, Calendar, User, Clock, Scissors } from 'lucide-react';
@@ -5,36 +6,52 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Appointment, Service } from '@/types/types';
+import { Appointment, Service, Professional, TimeSlot } from '@/types/types';
 import { supabase } from '@/integrations/supabase/client';
 
 const AppointmentSuccess = () => {
   const [searchParams] = useSearchParams();
   const appointmentId = searchParams.get('id');
   const [appointment, setAppointment] = useState<Appointment | null>(null);
-  const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchAppointmentDetails = async () => {
-      if (!appointmentId) return;
+      if (!appointmentId) {
+        setError("ID do agendamento não encontrado.");
+        setLoading(false);
+        return;
+      }
       
       try {
-        const { data, error } = await supabase
+        console.log('Fetching appointment with ID:', appointmentId);
+        const { data, error: fetchError } = await supabase
           .from('appointments')
           .select(`
             *,
-            professionals:professional_id (name),
-            services:service_id (name, duration, price, description),
-            slots:slot_id (start_time, end_time)
+            professionals:professional_id (id, name, photo_url),
+            services:service_id (id, name, duration, price, description),
+            slots:slot_id (id, start_time, end_time)
           `)
           .eq('id', appointmentId)
           .single();
         
-        if (error) {
-          console.error('Error fetching appointment details:', error);
+        if (fetchError) {
+          console.error('Error fetching appointment details:', fetchError);
+          setError("Erro ao carregar detalhes do agendamento.");
+          setLoading(false);
           return;
         }
+        
+        if (!data) {
+          console.error('No appointment data found');
+          setError("Agendamento não encontrado.");
+          setLoading(false);
+          return;
+        }
+
+        console.log('Appointment data received:', data);
         
         const appointmentData: Appointment = {
           id: data.id,
@@ -45,25 +62,15 @@ const AppointmentSuccess = () => {
           client_phone: data.client_phone,
           status: data.status as 'confirmed' | 'cancelled' | 'completed',
           created_at: data.created_at,
-          professionals: data.professionals,
-          services: data.services,
-          slots: data.slots
+          professionals: data.professionals as Professional,
+          services: data.services as Service,
+          slots: data.slots as TimeSlot
         };
         
         setAppointment(appointmentData);
-        
-        if (data.services) {
-          const serviceData: Service = {
-            id: data.service_id,
-            name: data.services.name,
-            description: data.services.description,
-            duration: data.services.duration,
-            price: data.services.price
-          };
-          setService(serviceData);
-        }
       } catch (err) {
         console.error('Unexpected error:', err);
+        setError("Ocorreu um erro inesperado.");
       } finally {
         setLoading(false);
       }
@@ -86,13 +93,13 @@ const AppointmentSuccess = () => {
     );
   }
   
-  if (!appointment || !appointment.slots) {
+  if (error || !appointment || !appointment.slots) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-primary/10 to-background p-4 flex items-center justify-center">
         <Card className="w-full max-w-md mx-auto">
           <CardContent className="p-6">
             <div className="text-center text-muted-foreground">
-              <p>Não foi possível encontrar os detalhes do agendamento.</p>
+              <p>{error || "Não foi possível encontrar os detalhes do agendamento."}</p>
               <Button asChild className="mt-4">
                 <Link to="/">Voltar para o início</Link>
               </Button>
