@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, Plus, Trash2, Search, Phone } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import NavBar from '@/components/NavBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { fetchAppointmentsByPhone } from '@/services/api';
+import { fetchAppointmentsByPhone, updateAppointmentStatus } from '@/services/api';
+import { supabase } from '@/integrations/supabase/client';
 
 const AppointmentCard = ({ 
   appointment, 
@@ -79,6 +80,10 @@ const AppointmentCard = ({
               ? `R$ ${Number(appointment.services.price).toFixed(2).replace('.', ',')}` 
               : appointment.price}
           </p>
+          
+          {appointment.status === 'cancelled' && (
+            <span className="text-xs text-destructive font-medium">CANCELADO</span>
+          )}
           
           {!isPast && appointment.status !== 'cancelled' && onCancel && (
             <AlertDialog>
@@ -174,6 +179,8 @@ const Appointments = () => {
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
   
+  const queryClient = useQueryClient();
+  
   // Query to fetch appointments by phone number
   const { 
     data: fetchedAppointments,
@@ -186,6 +193,21 @@ const Appointments = () => {
     enabled: !!phoneNumber
   });
   
+  // Mutation for cancelling appointment
+  const cancelAppointmentMutation = useMutation({
+    mutationFn: async (appointmentId: string) => {
+      return await updateAppointmentStatus(appointmentId, 'cancelled');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['appointments', phoneNumber] });
+      toast.success("Agendamento cancelado com sucesso!");
+    },
+    onError: (error) => {
+      console.error('Error cancelling appointment:', error);
+      toast.error("Erro ao cancelar agendamento. Tente novamente.");
+    }
+  });
+  
   // Update appointments when data is fetched
   useEffect(() => {
     if (fetchedAppointments) {
@@ -195,12 +217,7 @@ const Appointments = () => {
   
   // Handle appointment cancellation
   const handleCancelAppointment = (id: string) => {
-    // Update local state for immediate UI feedback
-    setAppointments(prev => 
-      prev.map(app => app.id === id ? { ...app, status: 'cancelled' } : app)
-    );
-    
-    toast.success("Agendamento cancelado com sucesso.");
+    cancelAppointmentMutation.mutate(id);
   };
   
   // Filter appointments based on search query
@@ -222,15 +239,18 @@ const Appointments = () => {
   // Separate upcoming and past appointments
   const now = new Date();
   const upcomingAppointments = filteredAppointments.filter(app => {
-    if (app.status === 'cancelled') return false;
+    if (app.status === 'cancelled' || app.status === 'completed') return false;
     
     const appointmentDate = app.slots?.start_time ? new Date(app.slots.start_time) : null;
     return appointmentDate ? appointmentDate > now : true; // Default to upcoming if no date
   });
   
-  const pastAppointments = filteredAppointments.filter(app => {
+  const pastOrCancelledAppointments = filteredAppointments.filter(app => {
+    if (app.status === 'cancelled') return true;
+    if (app.status === 'completed') return true;
+    
     const appointmentDate = app.slots?.start_time ? new Date(app.slots.start_time) : null;
-    return (appointmentDate && appointmentDate <= now) || app.status === 'cancelled';
+    return appointmentDate ? appointmentDate <= now : false;
   });
 
   // If no phone number provided yet, show the phone entry form
@@ -342,8 +362,8 @@ const Appointments = () => {
                 </TabsContent>
                 
                 <TabsContent value="past" className="space-y-4">
-                  {pastAppointments.length > 0 ? (
-                    pastAppointments.map(appointment => (
+                  {pastOrCancelledAppointments.length > 0 ? (
+                    pastOrCancelledAppointments.map(appointment => (
                       <AppointmentCard
                         key={appointment.id}
                         appointment={appointment}

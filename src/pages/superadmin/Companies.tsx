@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Building, Edit, Trash, Link as LinkIcon, Copy, Eye } from 'lucide-react';
+import { Building, Edit, Trash, Link as LinkIcon, Copy, Eye, AlertCircle, Calendar } from 'lucide-react';
 import { Company } from '@/types/webhook';
 
 const CompaniesPage = () => {
@@ -18,12 +18,18 @@ const CompaniesPage = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#663399');
   const [secondaryColor, setSecondaryColor] = useState('#FFA500');
   const [slug, setSlug] = useState('');
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Plan management
+  const [planType, setPlanType] = useState('basic');
+  const [planValue, setPlanValue] = useState('0');
+  const [planExpiryDate, setPlanExpiryDate] = useState('');
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -92,6 +98,43 @@ const CompaniesPage = () => {
     setIsDialogOpen(true);
   };
 
+  const handleOpenPlanDialog = (company: Company) => {
+    setEditingCompany(company);
+    setPlanType(company.plan || 'basic');
+    setPlanValue(company.plan_value?.toString() || '0');
+    setPlanExpiryDate(company.plan_expiry_date?.split('T')[0] || '');
+    setIsPlanDialogOpen(true);
+  };
+
+  const handleSavePlan = async () => {
+    if (!editingCompany) return;
+    
+    setIsSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          plan: planType,
+          plan_value: parseFloat(planValue),
+          plan_expiry_date: planExpiryDate ? new Date(planExpiryDate).toISOString() : null,
+          is_active: new Date(planExpiryDate) > new Date() || !planExpiryDate
+        })
+        .eq('id', editingCompany.id);
+      
+      if (error) throw error;
+      
+      toast.success('Plano atualizado com sucesso');
+      setIsPlanDialogOpen(false);
+      fetchCompanies();
+    } catch (error: any) {
+      console.error('Error saving plan:', error);
+      toast.error(`Erro ao salvar plano: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveCompany = async () => {
     if (!name || !slug) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
@@ -140,7 +183,8 @@ const CompaniesPage = () => {
         name,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
-        slug
+        slug,
+        is_active: true
       };
       
       let result;
@@ -211,6 +255,11 @@ const CompaniesPage = () => {
     }
   };
 
+  const isCompanyActive = (company: Company) => {
+    if (!company.plan_expiry_date) return true;
+    return new Date(company.plan_expiry_date) > new Date();
+  };
+
   return (
     <AdminLayout>
       <div className="p-6">
@@ -248,6 +297,8 @@ const CompaniesPage = () => {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Slug</TableHead>
+                    <TableHead>Plano</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Cores</TableHead>
                     <TableHead>Link Público</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
@@ -258,6 +309,32 @@ const CompaniesPage = () => {
                     <TableRow key={company.id}>
                       <TableCell className="font-medium">{company.name}</TableCell>
                       <TableCell>{company.slug}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium capitalize">{company.plan || 'Básico'}</span>
+                          {company.plan_value ? (
+                            <span className="text-xs text-muted-foreground">
+                              R$ {company.plan_value.toFixed(2).replace('.', ',')}
+                            </span>
+                          ) : null}
+                          {company.plan_expiry_date && (
+                            <span className="text-xs text-muted-foreground">
+                              Expira: {new Date(company.plan_expiry_date).toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {isCompanyActive(company) ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Ativo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            Expirado
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
                           <div 
@@ -280,6 +357,9 @@ const CompaniesPage = () => {
                       <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="sm" onClick={() => window.open(`/${company.slug}`, '_blank')}>
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenPlanDialog(company)}>
+                          <Calendar className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(company)}>
                           <Edit className="h-4 w-4" />
@@ -389,6 +469,95 @@ const CompaniesPage = () => {
               disabled={isSaving || !name || !slug}
             >
               {isSaving ? 'Salvando...' : editingCompany ? 'Atualizar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Plan Management Dialog */}
+      <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Gerenciar Plano
+            </DialogTitle>
+            <DialogDescription>
+              Configure o plano e a data de validade para {editingCompany?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="planType">Tipo de Plano</Label>
+              <select
+                id="planType"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={planType}
+                onChange={(e) => setPlanType(e.target.value)}
+              >
+                <option value="basic">Básico</option>
+                <option value="standard">Padrão</option>
+                <option value="premium">Premium</option>
+                <option value="enterprise">Empresarial</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="planValue">Valor do Plano (R$)</Label>
+              <Input 
+                id="planValue" 
+                type="number"
+                value={planValue} 
+                onChange={(e) => setPlanValue(e.target.value)}
+                placeholder="99.90"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="planExpiryDate">Data de Expiração</Label>
+              <Input 
+                id="planExpiryDate" 
+                type="date"
+                value={planExpiryDate} 
+                onChange={(e) => setPlanExpiryDate(e.target.value)}
+              />
+              {planExpiryDate && (
+                <p className="text-xs text-muted-foreground">
+                  O plano {new Date(planExpiryDate) > new Date() ? 'expirará' : 'expirou'} em {new Date(planExpiryDate).toLocaleDateString('pt-BR')}
+                </p>
+              )}
+            </div>
+            
+            {editingCompany && editingCompany.plan_expiry_date && new Date(editingCompany.plan_expiry_date) < new Date() && (
+              <div className="rounded-md bg-amber-50 p-4 mt-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-amber-400" aria-hidden="true" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-amber-800">Plano Expirado</h3>
+                    <div className="mt-2 text-sm text-amber-700">
+                      <p>
+                        O plano desta empresa já expirou. Os usuários não conseguirão acessar o sistema até que a data de expiração seja atualizada.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button 
+              onClick={handleSavePlan} 
+              disabled={isSaving}
+            >
+              {isSaving ? 'Salvando...' : 'Salvar Plano'}
             </Button>
           </DialogFooter>
         </DialogContent>

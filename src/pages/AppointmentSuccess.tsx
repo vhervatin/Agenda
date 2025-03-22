@@ -67,7 +67,7 @@ const AppointmentSuccess = () => {
                 <div className="text-left">
                   <p className="text-muted-foreground text-sm">Data e Hora</p>
                   <p className="font-medium">
-                    {appointmentData?.date || "Segunda, 12 de Junho"} - {appointmentData?.time || "14:30"}
+                    {appointmentData?.date || "Data não informada"} - {appointmentData?.time || "Horário não informado"}
                   </p>
                 </div>
               </div>
@@ -79,11 +79,11 @@ const AppointmentSuccess = () => {
                 </div>
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-muted-foreground">Duração</span>
-                  <span>{appointmentData?.service?.duration || "45 minutos"}</span>
+                  <span>{appointmentData?.service?.duration || "Não informada"}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-muted-foreground">Valor</span>
-                  <span className="font-medium">{appointmentData?.service?.price || "R$ 80,00"}</span>
+                  <span className="font-medium">{appointmentData?.service?.price || "Não informado"}</span>
                 </div>
               </div>
             </div>

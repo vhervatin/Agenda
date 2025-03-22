@@ -49,4 +49,5 @@ export interface User {
   email: string;
   role: 'admin' | 'professional';
   tipo_usuario?: 'admin' | 'superadmin';
+  auth_id?: string;
 }

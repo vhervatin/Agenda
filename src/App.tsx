@@ -53,6 +53,9 @@ const App = () => (
           <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
           <Route path="/superadmin/companies" element={<SuperAdminCompanies />} />
           
+          {/* Company subdomain routes */}
+          <Route path="/:companySlug/*" element={<Index />} />
+          
           {/* Calendar route will redirect to appointments for now */}
           <Route path="/calendar" element={<Appointments />} />
           <Route path="*" element={<NotFound />} />

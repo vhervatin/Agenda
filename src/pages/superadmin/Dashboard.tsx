@@ -5,12 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Building, Users, Settings, Link } from 'lucide-react';
+import { AlertCircle, Building, Users, Settings, Calendar, CreditCard } from 'lucide-react';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [companyCount, setCompanyCount] = useState(0);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -36,6 +37,7 @@ const SuperAdminDashboard = () => {
         }
         
         setIsSuperAdmin(true);
+        fetchCompanyCount();
       } catch (error) {
         console.error('Error checking superadmin access:', error);
         navigate('/login');
@@ -46,6 +48,19 @@ const SuperAdminDashboard = () => {
     
     checkAccess();
   }, [navigate]);
+
+  const fetchCompanyCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('companies')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error) throw error;
+      setCompanyCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching company count:', error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -88,66 +103,78 @@ const SuperAdminDashboard = () => {
     <AdminLayout>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Painel do Superadmin</h1>
+          <h1 className="text-2xl font-bold">Painel SuperAdmin</h1>
         </div>
         
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Gerenciar Empresas
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Empresas</CardTitle>
               <Building className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Empresas</div>
+              <div className="text-2xl font-bold">{companyCount}</div>
               <p className="text-xs text-muted-foreground">
-                Gerencie as empresas e seus administradores
+                Total de empresas gerenciadas
               </p>
             </CardContent>
             <CardFooter>
               <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/companies')}>
-                Acessar
+                Gerenciar Empresas
               </Button>
             </CardFooter>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Gerenciar Usuários
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Planos</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Assinaturas</div>
+              <p className="text-xs text-muted-foreground">
+                Gerencie planos e pagamentos
+              </p>
+            </CardContent>
+            <CardFooter>
+              <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/plans')}>
+                Gerenciar Planos
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Usuários</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Usuários</div>
+              <div className="text-2xl font-bold">Contas</div>
               <p className="text-xs text-muted-foreground">
-                Gerencie os usuários do sistema
+                Gerenciar contas de administradores
               </p>
             </CardContent>
             <CardFooter>
               <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/users')}>
-                Acessar
+                Gerenciar Usuários
               </Button>
             </CardFooter>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Personalização
-              </CardTitle>
-              <Settings className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Agendamentos</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">Configurações</div>
+              <div className="text-2xl font-bold">Relatórios</div>
               <p className="text-xs text-muted-foreground">
-                Personalize as empresas com cores e logotipos
+                Visualizar estatísticas de agendamentos
               </p>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/customization')}>
-                Acessar
+              <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/reports')}>
+                Ver Relatórios
               </Button>
             </CardFooter>
           </Card>
