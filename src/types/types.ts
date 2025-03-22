@@ -77,7 +77,7 @@ export interface WebhookConfiguration {
   url: string;
   event_type?: string;
   company_id?: string;
-  is_active?: boolean;
+  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 }

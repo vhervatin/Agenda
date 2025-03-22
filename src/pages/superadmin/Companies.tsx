@@ -17,7 +17,7 @@ import {
   Pencil, 
   Check, 
   X, 
-  Calendar, 
+  CalendarIcon,
   Hash, 
   CreditCard, 
   Mail, 
@@ -49,9 +49,10 @@ const Companies = () => {
     queryFn: fetchCompanies
   });
   
-  const createCompanyMutation = useMutation(createCompany, {
+  const createCompanyMutation = useMutation({
+    mutationFn: createCompany,
     onSuccess: () => {
-      queryClient.invalidateQueries(['companies']);
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
       setIsCreateDialogOpen(false);
       toast.success('Empresa criada com sucesso!');
     },
@@ -60,19 +61,18 @@ const Companies = () => {
     }
   });
   
-  const updateCompanyMutation = useMutation(
-    (updates: { id: string; company: Partial<Company> }) => updateCompany(updates.id, updates.company),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['companies']);
-        setIsEditDialogOpen(false);
-        toast.success('Empresa atualizada com sucesso!');
-      },
-      onError: (error: any) => {
-        toast.error(`Erro ao atualizar empresa: ${error.message || 'Unknown error'}`);
-      }
+  const updateCompanyMutation = useMutation({
+    mutationFn: (updates: { id: string; company: Partial<Company> }) => 
+      updateCompany(updates.id, updates.company),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      setIsEditDialogOpen(false);
+      toast.success('Empresa atualizada com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao atualizar empresa: ${error.message || 'Unknown error'}`);
     }
-  );
+  });
   
   const handleOpenCreateDialog = () => {
     setIsCreateDialogOpen(true);
