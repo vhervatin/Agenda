@@ -8,12 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Lock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginType, setLoginType] = useState('admin');
   
   // Check if user is already logged in
   useEffect(() => {
@@ -23,11 +25,11 @@ const Login = () => {
       if (session) {
         const { data: userData } = await supabase
           .from('users')
-          .select('role')
+          .select('role, tipo_usuario')
           .eq('auth_id', session.user.id)
           .single();
         
-        if (userData && userData.role === 'superadmin') {
+        if (userData && userData.tipo_usuario === 'superadmin') {
           navigate('/superadmin/dashboard');
         } else {
           navigate('/admin/dashboard');
@@ -43,13 +45,13 @@ const Login = () => {
         try {
           const { data: userData, error } = await supabase
             .from('users')
-            .select('role')
+            .select('role, tipo_usuario')
             .eq('auth_id', session.user.id)
             .single();
           
           if (error) throw error;
           
-          if (userData && userData.role === 'superadmin') {
+          if (userData && userData.tipo_usuario === 'superadmin') {
             navigate('/superadmin/dashboard');
           } else {
             navigate('/admin/dashboard');
@@ -120,8 +122,21 @@ const Login = () => {
               Entre com suas credenciais para acessar o painel de controle
             </CardDescription>
           </CardHeader>
+          
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
+              <Tabs 
+                defaultValue="admin" 
+                value={loginType} 
+                onValueChange={setLoginType} 
+                className="w-full"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="admin">Administrador</TabsTrigger>
+                  <TabsTrigger value="superadmin">Superadmin</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

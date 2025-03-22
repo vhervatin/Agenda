@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AdminLayout from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Building, Users } from 'lucide-react';
+import { AlertCircle, Building, Users, Settings, Link } from 'lucide-react';
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -24,13 +24,13 @@ const SuperAdminDashboard = () => {
         
         const { data: userData, error } = await supabase
           .from('users')
-          .select('role')
+          .select('role, tipo_usuario')
           .eq('auth_id', session.user.id)
           .single();
         
         if (error) throw error;
         
-        if (!userData || userData.role !== 'superadmin') {
+        if (!userData || userData.tipo_usuario !== 'superadmin') {
           navigate('/admin/dashboard');
           return;
         }
@@ -104,10 +104,12 @@ const SuperAdminDashboard = () => {
               <p className="text-xs text-muted-foreground">
                 Gerencie as empresas e seus administradores
               </p>
-              <Button className="w-full mt-4" size="sm">
+            </CardContent>
+            <CardFooter>
+              <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/companies')}>
                 Acessar
               </Button>
-            </CardContent>
+            </CardFooter>
           </Card>
           
           <Card>
@@ -122,10 +124,32 @@ const SuperAdminDashboard = () => {
               <p className="text-xs text-muted-foreground">
                 Gerencie os usuários do sistema
               </p>
-              <Button className="w-full mt-4" size="sm">
+            </CardContent>
+            <CardFooter>
+              <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/users')}>
                 Acessar
               </Button>
+            </CardFooter>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Personalização
+              </CardTitle>
+              <Settings className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Configurações</div>
+              <p className="text-xs text-muted-foreground">
+                Personalize as empresas com cores e logotipos
+              </p>
             </CardContent>
+            <CardFooter>
+              <Button className="w-full" size="sm" onClick={() => navigate('/superadmin/customization')}>
+                Acessar
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>

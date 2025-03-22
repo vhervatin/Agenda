@@ -1,143 +1,150 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.9.1';
 
-interface WebhookPayload {
-  evento: string;
-  id_agendamento: string;
-  [key: string]: any;
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+export const handler = async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-Deno.serve(async (req) => {
   try {
-    // Handle CORS preflight request
-    if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-        status: 204,
-      });
-    }
-
-    // Only handle POST requests
-    if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-        status: 405,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Parse the request body
-    const payload: WebhookPayload = await req.json();
-    console.log('Received webhook payload:', payload);
-
-    // Get webhook configurations
-    const { data: webhookConfigs, error: configError } = await supabase
+    // Get payload from request
+    const payload = await req.json();
+    
+    // Get webhook URL from database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    const { data: webhookConfig, error: configError } = await supabase
       .from('webhook_configurations')
-      .select('*')
-      .eq('is_active', true);
-
-    if (configError) {
-      console.error('Error fetching webhook configurations:', configError);
-      return new Response(JSON.stringify({ error: 'Internal server error' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      .select('id, url')
+      .eq('is_active', true)
+      .single();
+    
+    if (configError || !webhookConfig) {
+      console.error('Error getting webhook URL:', configError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'No active webhook configuration found' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404 
+        }
+      );
     }
-
-    if (!webhookConfigs || webhookConfigs.length === 0) {
-      console.log('No active webhook configurations found');
-      return new Response(JSON.stringify({ message: 'No webhooks to process' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    
+    // Attempt to send the webhook
+    let success = false;
+    let attempts = 0;
+    let maxAttempts = 3;
+    let lastError = null;
+    
+    // Create a log entry
+    const { data: logEntry, error: logError } = await supabase
+      .from('webhook_logs')
+      .insert({
+        webhook_id: webhookConfig.id,
+        event_type: payload.evento || 'unknown',
+        payload: payload,
+        status: 'pending',
+        attempts: 0
+      })
+      .select()
+      .single();
+    
+    if (logError) {
+      console.error('Error creating webhook log entry:', logError);
     }
-
-    // Process each webhook
-    const results = await Promise.allSettled(
-      webhookConfigs.map(async (config) => {
-        let attempts = 1;
-        let success = false;
-        let lastError = null;
+    
+    while (!success && attempts < maxAttempts) {
+      attempts++;
+      
+      try {
+        const response = await fetch(webhookConfig.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
         
-        // Try up to 3 times
-        while (attempts <= 3 && !success) {
-          try {
-            const response = await fetch(config.url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(payload),
-            });
-
-            if (response.ok) {
-              success = true;
-              console.log(`Webhook sent successfully to ${config.url} on attempt ${attempts}`);
-            } else {
-              lastError = `HTTP error: ${response.status} ${response.statusText}`;
-              console.error(`Failed to send webhook on attempt ${attempts}: ${lastError}`);
-              attempts++;
-              // Wait a bit before retrying (exponential backoff)
-              if (attempts <= 3) {
-                await new Promise(resolve => setTimeout(resolve, attempts * 1000));
-              }
-            }
-          } catch (error) {
-            lastError = error.message || 'Unknown error';
-            console.error(`Error sending webhook on attempt ${attempts}:`, error);
-            attempts++;
-            // Wait a bit before retrying
-            if (attempts <= 3) {
-              await new Promise(resolve => setTimeout(resolve, attempts * 1000));
-            }
+        if (response.ok) {
+          success = true;
+          
+          // Update the log entry
+          if (logEntry) {
+            await supabase
+              .from('webhook_logs')
+              .update({
+                status: 'success',
+                attempts: attempts
+              })
+              .eq('id', logEntry.id);
+          }
+          
+          break;
+        } else {
+          lastError = `HTTP error: ${response.status} ${response.statusText}`;
+          
+          // Wait before retrying (exponential backoff)
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)));
           }
         }
-
-        // Update the log
-        const { error: logError } = await supabase
-          .from('webhook_logs')
-          .update({
-            status: success ? 'success' : 'failed',
-            attempts,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('webhook_id', config.id)
-          .eq('event_type', payload.evento)
-          .eq('payload', payload);
-
-        if (logError) {
-          console.error('Error updating webhook log:', logError);
+      } catch (error) {
+        lastError = error.message;
+        
+        // Wait before retrying (exponential backoff)
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts)));
         }
-
-        return {
-          webhookId: config.id,
-          success,
-          attempts,
-          error: lastError,
-        };
-      })
+      }
+    }
+    
+    // Update the log entry if failed
+    if (!success && logEntry) {
+      await supabase
+        .from('webhook_logs')
+        .update({
+          status: 'failed',
+          attempts: attempts
+        })
+        .eq('id', logEntry.id);
+    }
+    
+    return new Response(
+      JSON.stringify({ 
+        success, 
+        attempts,
+        error: lastError 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: success ? 200 : 500 
+      }
     );
-
-    return new Response(JSON.stringify({ 
-      message: 'Webhook processing completed',
-      results 
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
   } catch (error) {
-    console.error('Unhandled error in webhook processor:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('Error processing webhook:', error);
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
+    );
   }
-});
+};
+
+Deno.serve(handler);

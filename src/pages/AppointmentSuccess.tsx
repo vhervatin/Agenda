@@ -34,6 +34,7 @@ const AppointmentSuccess = () => {
     // Try to get appointment data from location state
     if (location.state && location.state.appointmentData) {
       setAppointmentData(location.state.appointmentData);
+      console.log("Appointment data:", location.state.appointmentData);
     }
     
     return () => clearTimeout(timer);
@@ -74,7 +75,7 @@ const AppointmentSuccess = () => {
               <div className="border-t my-4 pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Serviço</span>
-                  <span className="font-medium">{appointmentData?.service?.name || "Corte de Cabelo"}</span>
+                  <span className="font-medium">{appointmentData?.service?.name || "Serviço não especificado"}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-muted-foreground">Duração</span>

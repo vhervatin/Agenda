@@ -18,6 +18,7 @@ import AdminAppointments from "./pages/admin/Appointments";
 import AdminSettings from "./pages/admin/Settings";
 import AdminIntegrations from "./pages/admin/Integrations";
 import SuperAdminDashboard from "./pages/superadmin/Dashboard";
+import SuperAdminCompanies from "./pages/superadmin/Companies";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
           {/* SuperAdmin Routes */}
           <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
           <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin/companies" element={<SuperAdminCompanies />} />
           
           {/* Calendar route will redirect to appointments for now */}
           <Route path="/calendar" element={<Appointments />} />

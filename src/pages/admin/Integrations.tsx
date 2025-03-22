@@ -10,26 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Webhook, ArrowUpDown, Clock, Check, X } from 'lucide-react';
-
-interface WebhookConfiguration {
-  id: string;
-  url: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface WebhookLog {
-  id: string;
-  webhook_id: string;
-  event_type: string;
-  payload: any;
-  status: string;
-  attempts: number;
-  created_at: string;
-  updated_at: string;
-}
+import { WebhookConfiguration, WebhookLog } from '@/types/webhook';
 
 const IntegrationsPage = () => {
   const [url, setUrl] = useState('');
@@ -39,6 +22,7 @@ const IntegrationsPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [webhookConfig, setWebhookConfig] = useState<WebhookConfiguration | null>(null);
   const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([]);
+  const [selectedEventType, setSelectedEventType] = useState<string>('all');
 
   useEffect(() => {
     fetchWebhookConfig();
@@ -60,7 +44,7 @@ const IntegrationsPage = () => {
       }
 
       if (data) {
-        setWebhookConfig(data as WebhookConfiguration);
+        setWebhookConfig(data as unknown as WebhookConfiguration);
         setUrl(data.url);
         setIsActive(data.is_active);
       }
@@ -84,7 +68,7 @@ const IntegrationsPage = () => {
         return;
       }
 
-      setWebhookLogs(data as WebhookLog[]);
+      setWebhookLogs(data as unknown as WebhookLog[]);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -111,7 +95,7 @@ const IntegrationsPage = () => {
         // Create new webhook
         operation = supabase
           .from('webhook_configurations')
-          .insert([{ url, is_active: isActive }]);
+          .insert([{ url, is_active: isActive }] as any);
       }
 
       const { error } = await operation;
@@ -138,7 +122,7 @@ const IntegrationsPage = () => {
 
     try {
       const testPayload = {
-        evento: 'teste_webhook',
+        evento: selectedEventType === 'all' ? 'teste_webhook' : selectedEventType,
         timestamp: new Date().toISOString(),
         mensagem: 'Este é um teste de webhook'
       };
@@ -177,6 +161,11 @@ const IntegrationsPage = () => {
     }
   };
 
+  // Filter logs by event type
+  const filteredLogs = selectedEventType === 'all' 
+    ? webhookLogs 
+    : webhookLogs.filter(log => log.event_type === selectedEventType);
+
   return (
     <AdminLayout>
       <div className="p-6">
@@ -211,6 +200,25 @@ const IntegrationsPage = () => {
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                     />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="eventType">Tipo de Evento para Teste</Label>
+                    <Select 
+                      value={selectedEventType} 
+                      onValueChange={setSelectedEventType}
+                    >
+                      <SelectTrigger id="eventType">
+                        <SelectValue placeholder="Selecione o tipo de evento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os eventos</SelectItem>
+                        <SelectItem value="agendamento_criado">Agendamento Criado</SelectItem>
+                        <SelectItem value="agendamento_cancelado">Agendamento Cancelado</SelectItem>
+                        <SelectItem value="agendamento_concluido">Agendamento Concluído</SelectItem>
+                        <SelectItem value="lembrete_agendamento">Lembrete de Agendamento</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div className="flex items-center space-x-2">
@@ -314,13 +322,32 @@ const IntegrationsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {webhookLogs.length === 0 ? (
+                <div className="mb-4">
+                  <Label htmlFor="filterEventType">Filtrar por tipo de evento</Label>
+                  <Select 
+                    value={selectedEventType} 
+                    onValueChange={setSelectedEventType}
+                  >
+                    <SelectTrigger id="filterEventType">
+                      <SelectValue placeholder="Todos os eventos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os eventos</SelectItem>
+                      <SelectItem value="agendamento_criado">Agendamento Criado</SelectItem>
+                      <SelectItem value="agendamento_cancelado">Agendamento Cancelado</SelectItem>
+                      <SelectItem value="agendamento_concluido">Agendamento Concluído</SelectItem>
+                      <SelectItem value="lembrete_agendamento">Lembrete de Agendamento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {filteredLogs.length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground">
                     Nenhum log de webhook encontrado
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {webhookLogs.map((log) => (
+                    {filteredLogs.map((log) => (
                       <div key={log.id} className="border rounded-md p-3">
                         <div className="flex justify-between items-start mb-2">
                           <div>
