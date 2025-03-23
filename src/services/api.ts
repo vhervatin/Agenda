@@ -207,6 +207,20 @@ export const updateService = async (id: string, service: Partial<Service>): Prom
   }
 };
 
+export const deleteService = async (id: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('services')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    throw error;
+  }
+};
+
 export const fetchProfessionalServices = async (professionalId: string): Promise<Service[]> => {
   try {
     const { data, error } = await supabase
@@ -511,7 +525,7 @@ export const fetchAppointments = async (): Promise<Appointment[]> => {
       .select(`
         *,
         professionals:professional_id (id, name, photo_url),
-        services:service_id (id, name, duration, price),
+        services:service_id (id, name, duration, price, description),
         slots:slot_id (id, start_time, end_time)
       `)
       .order('created_at', { ascending: false });
@@ -545,7 +559,7 @@ export const fetchAppointmentsByPhone = async (phone: string): Promise<Appointme
       .select(`
         *,
         professionals:professional_id (id, name, photo_url),
-        services:service_id (id, name, duration, price),
+        services:service_id (id, name, duration, price, description),
         slots:slot_id (id, start_time, end_time)
       `)
       .eq('client_phone', phone)

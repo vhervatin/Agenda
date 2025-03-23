@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -84,7 +83,7 @@ const Services = () => {
   
   // Delete service mutation
   const deleteMutation = useMutation({
-    mutationFn: deleteService,
+    mutationFn: (id: string) => deleteService(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       toast.success('Serviço removido com sucesso');

@@ -8,7 +8,6 @@ import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -113,7 +112,7 @@ const Login = () => {
                 </FormItem>
               )}
             />
-            <Button className="w-full" onClick={() => navigate("/")}>
+            <Button className="w-full" onClick={() => navigate("/")} type="button">
               Voltar para o início
             </Button>
             <Button type="submit" className="w-full" disabled={loginMutation.isPending}>

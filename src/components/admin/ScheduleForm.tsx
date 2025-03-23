@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -31,22 +30,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
-import { Slider } from "@/components/ui/slider"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 
 import { cn } from "@/lib/utils"
 import { createAvailableSlotsBulk, fetchProfessionals } from '@/services/api';
 import { Professional } from '@/types/types';
+
+type TimeRange = {
+  startHour: string;
+  startMinute: string;
+  endHour: string;
+  endMinute: string;
+};
 
 const timeRangeSchema = z.object({
   startHour: z.string().min(1, { message: "Selecione a hora de início" }),
@@ -66,6 +62,8 @@ const formSchema = z.object({
   selectedDays: z.array(z.number()).min(1, { message: "Selecione pelo menos um dia da semana" }),
   timeRanges: z.array(timeRangeSchema).min(1, { message: "Adicione pelo menos um intervalo de tempo" }),
 });
+
+type FormValues = z.infer<typeof formSchema>;
 
 const ScheduleForm = () => {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
@@ -88,7 +86,7 @@ const ScheduleForm = () => {
     loadProfessionals();
   }, []);
   
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       professionalId: "",
@@ -104,7 +102,7 @@ const ScheduleForm = () => {
   const professionalId = watch("professionalId");
   const selectedDays = watch("selectedDays");
   
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: FormValues) => {
     try {
       const { professionalId, startDate, endDate, selectedDays, timeRanges } = values;
       
@@ -123,21 +121,16 @@ const ScheduleForm = () => {
     }
   };
 
-  // Fixed the type issue by explicitly defining the type for the timeRange object
   const addTimeRange = () => {
-    const newTimeRange: {
-      startHour: string;
-      startMinute: string;
-      endHour: string;
-      endMinute: string;
-    } = {
+    const newTimeRange: TimeRange = {
       startHour: "09",
       startMinute: "00",
       endHour: "17",
       endMinute: "00"
     };
     
-    setValue("timeRanges", [...form.getValues("timeRanges"), newTimeRange]);
+    const currentTimeRanges = form.getValues("timeRanges");
+    setValue("timeRanges", [...currentTimeRanges, newTimeRange]);
   };
 
   return (

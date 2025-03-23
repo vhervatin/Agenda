@@ -7,7 +7,7 @@ export interface Professional {
   phone?: string;
   active?: boolean;
   user_id?: string;
-  company_id?: string; // Added for company association
+  company_id?: string;
 }
 
 export interface Service {
@@ -17,7 +17,7 @@ export interface Service {
   duration: number;
   price: number;
   active?: boolean;
-  company_id?: string; // Added for company association
+  company_id?: string;
 }
 
 export interface TimeSlot {
@@ -27,7 +27,7 @@ export interface TimeSlot {
   start_time?: string;
   end_time?: string;
   professional_id?: string;
-  company_id?: string; // Added for company association
+  company_id?: string;
 }
 
 export interface Appointment {
@@ -42,14 +42,14 @@ export interface Appointment {
   services?: Service;
   professionals?: Professional;
   slots?: TimeSlot;
-  company_id?: string; // Added for company association
+  company_id?: string;
 }
 
 export interface ProfessionalService {
   id: string;
   professional_id: string;
   service_id: string;
-  company_id?: string; // Added for company association
+  company_id?: string;
 }
 
 export interface User {
@@ -61,7 +61,7 @@ export interface User {
   auth_id?: string;
   created_at?: string;
   updated_at?: string;
-  company_id?: string; // Added for company association
+  company_id?: string;
 }
 
 export interface Company {
