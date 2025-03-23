@@ -109,22 +109,15 @@ const Booking = () => {
     )
       .then(result => {
         setIsSubmitting(false);
-        if (result.success) {
+        if (result.success && result.appointmentId) {
           toast.success("Agendamento confirmado com sucesso!");
-          navigate("/appointment-success", { 
-            state: { 
-              professionalName: selectedProfessionalObject?.name,
-              serviceName: selectedServiceObject?.name,
-              date: selectedDate,
-              time: selectedTimeObject?.time,
-              appointmentId: result.appointmentId
-            } 
-          });
+          navigate(`/appointment-success?id=${result.appointmentId}`);
         } else {
           toast.error("Não foi possível confirmar seu agendamento. Por favor, tente novamente.");
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Error creating appointment:", error);
         setIsSubmitting(false);
         toast.error("Ocorreu um erro ao processar seu agendamento. Por favor, tente novamente.");
       });

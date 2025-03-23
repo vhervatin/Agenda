@@ -8,7 +8,8 @@ import {
   ProfessionalService,
   User,
   Company,
-  WebhookConfiguration
+  WebhookConfiguration,
+  TimeRange
 } from "@/types/types";
 
 // Function to fetch professionals
@@ -137,6 +138,41 @@ export const createAppointment = async (
     
     if (updateError) {
       console.error('Error updating slot availability:', updateError);
+      // We already created the appointment, so we'll return success anyway
+    }
+    
+    // Process webhook for appointment_created event
+    try {
+      const { data: webhookConfigs } = await supabase
+        .from('webhook_configurations')
+        .select('*')
+        .eq('event_type', 'appointment_created')
+        .eq('is_active', true);
+      
+      if (webhookConfigs && webhookConfigs.length > 0) {
+        // Get the appointment date from the slot
+        const appointmentDate = slotData.start_time;
+        
+        // For each active webhook, trigger it
+        for (const webhook of webhookConfigs) {
+          await supabase.functions.invoke('process-webhook', {
+            body: {
+              webhookId: webhook.id,
+              eventType: 'appointment_created',
+              payload: {
+                appointment_id: appointmentData.id,
+                professional_id: professionalId,
+                service_id: serviceId,
+                client_name: clientName,
+                client_phone: clientPhone,
+                appointment_date: appointmentDate
+              }
+            }
+          });
+        }
+      }
+    } catch (webhookError) {
+      console.error('Error processing webhook:', webhookError);
       // We already created the appointment, so we'll return success anyway
     }
     

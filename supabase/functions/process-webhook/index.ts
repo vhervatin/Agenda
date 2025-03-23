@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -35,14 +36,10 @@ serve(async (req) => {
     const requestData = await req.json();
     const { webhookId, eventType, payload } = requestData;
 
-    // Add the actual appointment date to the webhook payload
-    let webhookPayload = { ...payload };
-    if (eventType === 'appointment_created' && payload.appointment_date) {
-      webhookPayload.appointment_date = payload.appointment_date;
-    }
+    console.log("Webhook received:", { webhookId, eventType, payload });
 
     // Validate required fields
-    if (!webhookId || !eventType || !webhookPayload) {
+    if (!webhookId || !eventType || !payload) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         {
@@ -113,6 +110,14 @@ serve(async (req) => {
       console.error("Failed to create webhook log:", logError);
     }
 
+    // Prepare the webhook payload including the appointment date
+    const webhookPayload = {
+      ...payload,
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log("Sending webhook with payload:", webhookPayload);
+
     // Attempt to send the webhook
     let success = false;
     let errorMessage = "";
@@ -168,7 +173,7 @@ serve(async (req) => {
               },
               body: JSON.stringify({
                 event: eventType,
-                data: payload,
+                data: webhookPayload,
                 timestamp: new Date().toISOString(),
                 retry: attempts,
               }),
