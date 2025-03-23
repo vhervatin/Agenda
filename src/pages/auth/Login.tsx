@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
@@ -16,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Logo } from "@/components/Logo";
+import Logo from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -27,11 +28,13 @@ const formSchema = z.object({
   }),
 });
 
+type FormValues = z.infer<typeof formSchema>;
+
 const Login = () => {
   const navigate = useNavigate();
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
@@ -39,8 +42,8 @@ const Login = () => {
     },
   });
 
-  const { mutate: loginUser, isLoading } = useMutation(
-    async (values: z.infer<typeof formSchema>) => {
+  const loginMutation = useMutation({
+    mutationFn: async (values: FormValues) => {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
@@ -52,24 +55,22 @@ const Login = () => {
 
       return data;
     },
-    {
-      onSuccess: (data) => {
-        console.log("Login successful:", data);
-        setLoginError(null);
-        localStorage.setItem('userType', 'admin');
-        navigate("/admin/dashboard");
-        toast.success("Login realizado com sucesso!");
-      },
-      onError: (error: any) => {
-        console.error("Login failed:", error);
-        setLoginError("Falha ao realizar o login. Verifique seu email e senha.");
-        toast.error("Falha ao realizar o login. Verifique seu email e senha.");
-      },
-    }
-  );
+    onSuccess: (data) => {
+      console.log("Login successful:", data);
+      setLoginError(null);
+      localStorage.setItem('userType', 'admin');
+      navigate("/admin/dashboard");
+      toast.success("Login realizado com sucesso!");
+    },
+    onError: (error: any) => {
+      console.error("Login failed:", error);
+      setLoginError("Falha ao realizar o login. Verifique seu email e senha.");
+      toast.error("Falha ao realizar o login. Verifique seu email e senha.");
+    },
+  });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    loginUser(values);
+  const onSubmit = (values: FormValues) => {
+    loginMutation.mutate(values);
   };
 
   return (
@@ -115,8 +116,8 @@ const Login = () => {
             <Button className="w-full" onClick={() => navigate("/")}>
               Voltar para o início
             </Button>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Entrando..." : "Entrar"}
+            <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+              {loginMutation.isPending ? "Entrando..." : "Entrar"}
             </Button>
           </form>
         </Form>

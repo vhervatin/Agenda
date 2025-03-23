@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Professional, Service, TimeSlot, Appointment, User, WebhookConfiguration, Company } from "@/types/types";
 
-export const createWebhooks = async (webhooks: Partial<WebhookConfiguration>[]) => {
+export const createWebhooks = async (webhooks: { url: string; event_type: string; is_active?: boolean }[]) => {
   try {
     const validWebhooks = webhooks.filter(webhook => webhook.url);
     
@@ -22,7 +22,7 @@ export const createWebhooks = async (webhooks: Partial<WebhookConfiguration>[]) 
   }
 };
 
-export const createCompanies = async (companies: Partial<Company>[]) => {
+export const createCompanies = async (companies: { name: string; slug: string; logo_url?: string; primary_color?: string; secondary_color?: string; plan?: string; plan_value?: number; plan_expiry_date?: string; is_active?: boolean }[]) => {
   try {
     const validCompanies = companies.filter(company => company.name && company.slug);
     
@@ -43,7 +43,7 @@ export const createCompanies = async (companies: Partial<Company>[]) => {
   }
 };
 
-export const createUsers = async (users: Partial<User>[]) => {
+export const createUsers = async (users: { email: string; name: string; role: 'admin' | 'professional'; tipo_usuario?: 'admin' | 'superadmin'; auth_id?: string; company_id?: string }[]) => {
   try {
     const validUsers = users.filter(user => user.email && user.name && user.role);
     
@@ -112,7 +112,7 @@ export const fetchProfessionals = async (): Promise<Professional[]> => {
   }
 };
 
-export const createProfessional = async (professional: Partial<Professional>): Promise<Professional> => {
+export const createProfessional = async (professional: { name: string; bio?: string; phone?: string; photo_url?: string; active?: boolean; user_id?: string; company_id?: string }): Promise<Professional> => {
   try {
     const { data, error } = await supabase
       .from('professionals')
@@ -174,7 +174,7 @@ export const fetchServices = async (): Promise<Service[]> => {
   }
 };
 
-export const createService = async (service: Partial<Service>): Promise<Service> => {
+export const createService = async (service: { name: string; description?: string; duration: number; price: number; active?: boolean; company_id?: string }): Promise<Service> => {
   try {
     const { data, error } = await supabase
       .from('services')
@@ -203,20 +203,6 @@ export const updateService = async (id: string, service: Partial<Service>): Prom
     return data;
   } catch (error) {
     console.error('Error updating service:', error);
-    throw error;
-  }
-};
-
-export const deleteService = async (id: string): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('services')
-      .delete()
-      .eq('id', id);
-      
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error deleting service:', error);
     throw error;
   }
 };
@@ -531,7 +517,21 @@ export const fetchAppointments = async (): Promise<Appointment[]> => {
       .order('created_at', { ascending: false });
       
     if (error) throw error;
-    return data || [];
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      professional_id: item.professional_id,
+      service_id: item.service_id,
+      slot_id: item.slot_id,
+      client_name: item.client_name,
+      client_phone: item.client_phone,
+      status: item.status as 'confirmed' | 'cancelled' | 'completed',
+      created_at: item.created_at,
+      professionals: item.professionals,
+      services: item.services,
+      slots: item.slots,
+      company_id: item.company_id
+    }));
   } catch (error) {
     console.error('Error fetching appointments:', error);
     throw error;
@@ -552,7 +552,21 @@ export const fetchAppointmentsByPhone = async (phone: string): Promise<Appointme
       .order('created_at', { ascending: false });
       
     if (error) throw error;
-    return data || [];
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      professional_id: item.professional_id,
+      service_id: item.service_id,
+      slot_id: item.slot_id,
+      client_name: item.client_name,
+      client_phone: item.client_phone,
+      status: item.status as 'confirmed' | 'cancelled' | 'completed',
+      created_at: item.created_at,
+      professionals: item.professionals,
+      services: item.services,
+      slots: item.slots,
+      company_id: item.company_id
+    }));
   } catch (error) {
     console.error('Error fetching appointments by phone:', error);
     throw error;
@@ -696,7 +710,7 @@ export const fetchCompanies = async (): Promise<Company[]> => {
   }
 };
 
-export const createCompany = async (company: Partial<Company>): Promise<Company> => {
+export const createCompany = async (company: { name: string; slug: string; logo_url?: string; primary_color?: string; secondary_color?: string; plan?: string; plan_value?: number; plan_expiry_date?: string; is_active?: boolean }): Promise<Company> => {
   try {
     const { data, error } = await supabase
       .from('companies')

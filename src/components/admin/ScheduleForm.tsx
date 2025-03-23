@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -120,6 +121,23 @@ const ScheduleForm = () => {
     } catch (error: any) {
       toast.error(`Erro ao criar horários: ${error.message || 'Erro desconhecido'}`);
     }
+  };
+
+  // Fixed the type issue by explicitly defining the type for the timeRange object
+  const addTimeRange = () => {
+    const newTimeRange: {
+      startHour: string;
+      startMinute: string;
+      endHour: string;
+      endMinute: string;
+    } = {
+      startHour: "09",
+      startMinute: "00",
+      endHour: "17",
+      endMinute: "00"
+    };
+    
+    setValue("timeRanges", [...form.getValues("timeRanges"), newTimeRange]);
   };
 
   return (
@@ -329,7 +347,7 @@ const ScheduleForm = () => {
             />
           </div>
         ))}
-        <Button type="button" variant="secondary" size="sm" onClick={() => setValue("timeRanges", [...form.getValues("timeRanges"), { startHour: "09", startMinute: "00", endHour: "17", endMinute: "00" }])}>
+        <Button type="button" variant="secondary" size="sm" onClick={addTimeRange}>
           Adicionar Horário
         </Button>
         <FormMessage />

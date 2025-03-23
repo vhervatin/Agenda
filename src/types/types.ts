@@ -89,9 +89,9 @@ export interface CompanyUser {
 export interface WebhookConfiguration {
   id: string;
   url: string;
-  event_type: string; // Changed to required
+  event_type: string;
   company_id?: string;
   is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }

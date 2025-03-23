@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,8 +20,8 @@ import {
   updateWebhookConfiguration,
   testWebhook
 } from '@/services/api';
-import { WebhookConfiguration, WebhookLog } from '@/types/webhook';
-import { format, parseISO } from 'date-fns';
+import { WebhookConfiguration as WebhookConfig } from '@/types/types';
+import { format } from 'date-fns';
 
 const Integrations = () => {
   const queryClient = useQueryClient();
@@ -30,7 +29,7 @@ const Integrations = () => {
   const [isActive, setIsActive] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
-  const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfiguration | null>(null);
+  const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfig | null>(null);
   const [selectedEventType, setSelectedEventType] = useState('appointment_created');
   const [testEventType, setTestEventType] = useState('appointment_created');
   const [isTesting, setIsTesting] = useState(false);
@@ -49,14 +48,15 @@ const Integrations = () => {
   
   // Create webhook configuration mutation
   const createMutation = useMutation({
-    mutationFn: (webhook: Partial<WebhookConfiguration>) => createWebhookConfiguration(webhook),
+    mutationFn: (webhook: { url: string; is_active: boolean; event_type: string }) => 
+      createWebhookConfiguration(webhook.url, webhook.event_type),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-configurations'] });
       setIsAddDialogOpen(false);
       setWebhookUrl('');
       toast.success('Webhook configurado com sucesso');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao configurar webhook: ${error.message}`);
     }
   });
@@ -69,14 +69,14 @@ const Integrations = () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-configurations'] });
       toast.success('Status do webhook atualizado');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao atualizar status: ${error.message}`);
     }
   });
   
   // Test webhook mutation
   const testWebhookMutation = useMutation({
-    mutationFn: ({ url, eventType }: { url: string; eventType: string }) => testWebhook(url, eventType),
+    mutationFn: (id: string) => testWebhook(id),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['webhook-logs'] });
       
@@ -88,7 +88,7 @@ const Integrations = () => {
       
       setIsTesting(false);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao testar webhook: ${error.message}`);
       setIsTesting(false);
     }
@@ -107,7 +107,7 @@ const Integrations = () => {
     });
   };
   
-  const handleToggleStatus = (webhook: WebhookConfiguration) => {
+  const handleToggleStatus = (webhook: WebhookConfig) => {
     updateStatusMutation.mutate({
       id: webhook.id,
       isActive: !webhook.is_active
@@ -118,13 +118,10 @@ const Integrations = () => {
     if (!selectedWebhook) return;
     
     setIsTesting(true);
-    testWebhookMutation.mutate({
-      url: selectedWebhook.url,
-      eventType: testEventType
-    });
+    testWebhookMutation.mutate(selectedWebhook.id);
   };
   
-  const openTestDialog = (webhook: WebhookConfiguration) => {
+  const openTestDialog = (webhook: WebhookConfig) => {
     setSelectedWebhook(webhook);
     setTestEventType(webhook.event_type || 'appointment_created');
     setIsTestDialogOpen(true);
