@@ -1,4 +1,3 @@
-
 export interface Professional {
   id: string;
   name: string;
@@ -41,7 +40,13 @@ export interface Appointment {
   created_at?: string;
   services?: Service;
   professionals?: Professional;
-  slots?: TimeSlot;
+  slots?: {
+    id: string;
+    time?: string;
+    available?: boolean;
+    start_time?: string;
+    end_time?: string;
+  };
   company_id?: string;
 }
 

@@ -60,7 +60,7 @@ const ProtectedRoute = ({
       setIsAuthenticated(true);
       setLoading(false);
       
-      // Check if user is accessing the correct routes
+      // Check if user is accessing the correct routes based on their type
       if (userType === 'superadmin' && storedUserType !== 'superadmin') {
         navigate('/admin/dashboard');
       } else if (userType === 'admin' && storedUserType === 'superadmin') {

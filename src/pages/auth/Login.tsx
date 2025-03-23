@@ -56,9 +56,18 @@ const Login = () => {
     },
     onSuccess: (data) => {
       console.log("Login successful:", data);
+      
+      // Check if user is superadmin (for demonstration - you should check actual roles)
+      const email = form.getValues().email;
+      if (email === "glivan.santos090420@gmail.com") {
+        localStorage.setItem('userType', 'superadmin');
+        navigate("/superadmin/dashboard");
+      } else {
+        localStorage.setItem('userType', 'admin');
+        navigate("/admin/dashboard");
+      }
+      
       setLoginError(null);
-      localStorage.setItem('userType', 'admin');
-      navigate("/admin/dashboard");
       toast.success("Login realizado com sucesso!");
     },
     onError: (error: any) => {
@@ -74,7 +83,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md space-y-8">
+      <div className="w-full max-w-md space-y-8 p-8 bg-card rounded-lg shadow-md">
         <div className="flex flex-col items-center justify-center">
           <Logo />
           <h2 className="mt-6 text-3xl font-bold">Login</h2>
@@ -112,7 +121,7 @@ const Login = () => {
                 </FormItem>
               )}
             />
-            <Button className="w-full" onClick={() => navigate("/")} type="button">
+            <Button className="w-full" onClick={() => navigate("/")} type="button" variant="outline">
               Voltar para o início
             </Button>
             <Button type="submit" className="w-full" disabled={loginMutation.isPending}>

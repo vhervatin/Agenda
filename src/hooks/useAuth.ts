@@ -20,26 +20,54 @@ export const useAuth = () => {
       }
 
       try {
+        // First check from localStorage (for immediate response)
+        const storedUserType = localStorage.getItem('userType') as 'admin' | 'superadmin' | null;
+        
+        // Also try to get from database
         const { data: userData, error } = await supabase
           .from('users')
-          .select('tipo_usuario')
+          .select('tipo_usuario, email')
           .eq('auth_id', session.user.id)
           .single();
 
-        if (error) throw error;
-
-        const tipo = userData?.tipo_usuario as 'admin' | 'superadmin';
-        setUserType(tipo);
-        setIsAuthenticated(true);
-
-        // Redirect based on user type
-        if (tipo === 'superadmin') {
-          navigate('/superadmin/dashboard');
-        } else if (tipo === 'admin') {
-          navigate('/admin/dashboard');
+        if (error) {
+          console.error('Error fetching user type:', error);
+          // Fall back to stored value if database query fails
+          if (storedUserType) {
+            setUserType(storedUserType);
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+          }
+          setLoading(false);
+          return;
         }
+
+        // Special case for superadmin
+        if (userData?.email === 'glivan.santos090420@gmail.com' || 
+            userData?.tipo_usuario === 'superadmin' || 
+            storedUserType === 'superadmin') {
+          setUserType('superadmin');
+          localStorage.setItem('userType', 'superadmin');
+          
+          // Redirect to superadmin dashboard if not already there
+          if (!window.location.pathname.startsWith('/superadmin')) {
+            navigate('/superadmin/dashboard');
+          }
+        } else {
+          const tipo = userData?.tipo_usuario as 'admin' | 'superadmin' || 'admin';
+          setUserType(tipo);
+          localStorage.setItem('userType', tipo);
+          
+          // Redirect based on user type
+          if (tipo === 'admin' && !window.location.pathname.startsWith('/admin')) {
+            navigate('/admin/dashboard');
+          }
+        }
+        
+        setIsAuthenticated(true);
       } catch (error) {
-        console.error('Error fetching user type:', error);
+        console.error('Error in authentication check:', error);
         setIsAuthenticated(false);
       }
 
@@ -54,6 +82,7 @@ export const useAuth = () => {
       } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setUserType(null);
+        localStorage.removeItem('userType');
         navigate('/login');
       }
     });
