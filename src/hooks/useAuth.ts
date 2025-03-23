@@ -50,7 +50,7 @@ export const useAuth = () => {
           setUserType('superadmin');
           localStorage.setItem('userType', 'superadmin');
           
-          // Redirect to superadmin dashboard if not already there
+          // Check if we're already in a superadmin route
           if (!window.location.pathname.startsWith('/superadmin')) {
             navigate('/superadmin/dashboard');
           }
@@ -59,7 +59,7 @@ export const useAuth = () => {
           setUserType(tipo);
           localStorage.setItem('userType', tipo);
           
-          // Redirect based on user type
+          // Only redirect if not in an admin route already
           if (tipo === 'admin' && !window.location.pathname.startsWith('/admin')) {
             navigate('/admin/dashboard');
           }

@@ -1,3 +1,4 @@
+
 export interface Professional {
   id: string;
   name: string;
@@ -99,4 +100,11 @@ export interface WebhookConfiguration {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface TimeRange {
+  startHour: string;
+  startMinute: string;
+  endHour: string;
+  endMinute: string;
 }
