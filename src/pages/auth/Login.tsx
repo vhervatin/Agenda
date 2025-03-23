@@ -1,259 +1,125 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'sonner';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, Loader2, Home } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import Logo from '@/components/Logo';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Logo } from "@/components/Logo";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const loginSchema = z.object({
-  email: z.string().email({ message: 'Email inválido' }),
-  password: z.string().min(6, { message: 'Senha deve ter no mínimo 6 caracteres' }),
-  rememberMe: z.boolean().optional(),
-  userType: z.enum(['admin', 'superadmin']).default('admin')
+const formSchema = z.object({
+  email: z.string().email({ message: "Por favor, insira um email válido." }),
+  password: z.string().min(8, {
+    message: "A senha deve ter pelo menos 8 caracteres.",
+  }),
 });
-
-type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
-      password: '',
-      rememberMe: false,
-      userType: 'admin'
-    }
+      email: "",
+      password: "",
+    },
   });
-  
-  const onSubmit = async (data: LoginFormValues) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Sign in with email/password
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password
+
+  const { mutate: loginUser, isLoading } = useMutation(
+    async (values: z.infer<typeof formSchema>) => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
       });
-      
-      if (authError) {
-        throw new Error(authError.message);
+
+      if (error) {
+        throw error;
       }
-      
-      // Fetch user info
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', authData.user?.id)
-        .single();
-      
-      if (userError) {
-        throw new Error('Erro ao buscar informações do usuário');
-      }
-      
-      // Validate user type
-      const userType = userData.tipo_usuario || 'admin';
-      const requestedType = data.userType;
-      
-      if (requestedType === 'superadmin' && userType !== 'superadmin') {
-        throw new Error('Você não tem permissão para acessar o painel de Superadmin');
-      }
-      
-      // Store user type in localStorage for future reference
-      localStorage.setItem('userType', userType);
-      
-      // Redirect based on user type
-      if (userType === 'superadmin') {
-        navigate('/superadmin/dashboard');
-      } else {
-        navigate('/admin/dashboard');
-      }
-      
-      toast.success('Login realizado com sucesso!');
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'Erro ao fazer login. Verifique suas credenciais.');
-      toast.error('Erro ao fazer login');
-    } finally {
-      setIsLoading(false);
+
+      return data;
+    },
+    {
+      onSuccess: (data) => {
+        console.log("Login successful:", data);
+        setLoginError(null);
+        localStorage.setItem('userType', 'admin');
+        navigate("/admin/dashboard");
+        toast.success("Login realizado com sucesso!");
+      },
+      onError: (error: any) => {
+        console.error("Login failed:", error);
+        setLoginError("Falha ao realizar o login. Verifique seu email e senha.");
+        toast.error("Falha ao realizar o login. Verifique seu email e senha.");
+      },
     }
+  );
+
+  const onSubmit = (values: z.infer<typeof formSchema>) => {
+    loginUser(values);
   };
-  
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md">
-        <div className="flex justify-center mb-6">
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center justify-center">
           <Logo />
+          <h2 className="mt-6 text-3xl font-bold">Login</h2>
         </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Login</CardTitle>
-            <CardDescription className="text-center">
-              Entre na sua conta para acessar o painel
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="admin">
-              <TabsList className="grid grid-cols-2 mb-4">
-                <TabsTrigger value="admin" onClick={() => form.setValue('userType', 'admin')}>
-                  Admin
-                </TabsTrigger>
-                <TabsTrigger value="superadmin" onClick={() => form.setValue('userType', 'superadmin')}>
-                  Superadmin
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="admin">
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="seu@email.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="seuemail@exemplo.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Senha</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="********"
+                      {...field}
                     />
-                    
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Senha</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="******" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="rememberMe"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center space-x-2">
-                          <FormControl>
-                            <Checkbox 
-                              checked={field.value} 
-                              onCheckedChange={field.onChange} 
-                            />
-                          </FormControl>
-                          <FormLabel className="text-sm cursor-pointer">
-                            Lembrar-me
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Entrando...
-                        </>
-                      ) : (
-                        'Entrar'
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-              
-              <TabsContent value="superadmin">
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="superadmin@email.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Senha</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="******" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Entrando...
-                        </>
-                      ) : (
-                        'Entrar como Superadmin'
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Não tem uma conta? Entre em contato com o administrador.
-            </p>
-            <Button variant="outline" asChild className="w-full">
-              <Link to="/">
-                <Home className="mr-2 h-4 w-4" />
-                Voltar para a página inicial
-              </Link>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button className="w-full" onClick={() => navigate("/")}>
+              Voltar para o início
             </Button>
-          </CardFooter>
-        </Card>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
+        </Form>
       </div>
     </div>
   );
