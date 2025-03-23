@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import Logo from '@/components/Logo';
 
@@ -74,8 +74,11 @@ const Login = () => {
         throw new Error('Você não tem permissão para acessar o painel de Superadmin');
       }
       
+      // Store user type in localStorage for future reference
+      localStorage.setItem('userType', userType);
+      
       // Redirect based on user type
-      if (requestedType === 'superadmin' && userType === 'superadmin') {
+      if (userType === 'superadmin') {
         navigate('/superadmin/dashboard');
       } else {
         navigate('/admin/dashboard');
@@ -239,10 +242,16 @@ const Login = () => {
               </TabsContent>
             </Tabs>
           </CardContent>
-          <CardFooter className="flex justify-center">
+          <CardFooter className="flex flex-col space-y-4">
             <p className="text-sm text-muted-foreground">
               Não tem uma conta? Entre em contato com o administrador.
             </p>
+            <Button variant="outline" asChild className="w-full">
+              <Link to="/">
+                <Home className="mr-2 h-4 w-4" />
+                Voltar para a página inicial
+              </Link>
+            </Button>
           </CardFooter>
         </Card>
       </div>

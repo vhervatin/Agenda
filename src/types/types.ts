@@ -7,6 +7,7 @@ export interface Professional {
   phone?: string;
   active?: boolean;
   user_id?: string;
+  company_id?: string; // Added for company association
 }
 
 export interface Service {
@@ -16,6 +17,7 @@ export interface Service {
   duration: number;
   price: number;
   active?: boolean;
+  company_id?: string; // Added for company association
 }
 
 export interface TimeSlot {
@@ -24,6 +26,8 @@ export interface TimeSlot {
   available: boolean;
   start_time?: string;
   end_time?: string;
+  professional_id?: string;
+  company_id?: string; // Added for company association
 }
 
 export interface Appointment {
@@ -38,12 +42,14 @@ export interface Appointment {
   services?: Service;
   professionals?: Professional;
   slots?: TimeSlot;
+  company_id?: string; // Added for company association
 }
 
 export interface ProfessionalService {
   id: string;
   professional_id: string;
   service_id: string;
+  company_id?: string; // Added for company association
 }
 
 export interface User {
@@ -55,6 +61,7 @@ export interface User {
   auth_id?: string;
   created_at?: string;
   updated_at?: string;
+  company_id?: string; // Added for company association
 }
 
 export interface Company {
@@ -72,10 +79,17 @@ export interface Company {
   updated_at?: string;
 }
 
+export interface CompanyUser {
+  id: string;
+  company_id: string;
+  user_id: string;
+  created_at?: string;
+}
+
 export interface WebhookConfiguration {
   id: string;
   url: string;
-  event_type?: string;
+  event_type: string; // Changed to required
   company_id?: string;
   is_active: boolean;
   created_at?: string;

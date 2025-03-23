@@ -53,6 +53,18 @@ const AppointmentSuccess = () => {
 
         console.log('Appointment data received:', data);
         
+        // Ensure all required data is present
+        if (!data.professionals || !data.services || !data.slots) {
+          console.error('Missing related data:', {
+            professionals: !!data.professionals,
+            services: !!data.services,
+            slots: !!data.slots
+          });
+          setError("Dados incompletos do agendamento.");
+          setLoading(false);
+          return;
+        }
+        
         const appointmentData: Appointment = {
           id: data.id,
           professional_id: data.professional_id,
@@ -67,6 +79,7 @@ const AppointmentSuccess = () => {
           slots: data.slots as TimeSlot
         };
         
+        console.log('Processed appointment data:', appointmentData);
         setAppointment(appointmentData);
       } catch (err) {
         console.error('Unexpected error:', err);
@@ -100,6 +113,24 @@ const AppointmentSuccess = () => {
           <CardContent className="p-6">
             <div className="text-center text-muted-foreground">
               <p>{error || "Não foi possível encontrar os detalhes do agendamento."}</p>
+              <Button asChild className="mt-4">
+                <Link to="/">Voltar para o início</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Safeguard against missing data
+  if (!appointment.professionals || !appointment.services) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary/10 to-background p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md mx-auto">
+          <CardContent className="p-6">
+            <div className="text-center text-muted-foreground">
+              <p>Dados incompletos do agendamento.</p>
               <Button asChild className="mt-4">
                 <Link to="/">Voltar para o início</Link>
               </Button>

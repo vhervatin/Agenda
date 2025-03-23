@@ -1,11 +1,8 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Professional, Service, TimeSlot, Appointment, User, WebhookConfiguration, Company } from "@/types/types";
 
-// Fix the createWebhooks function to properly handle array inserts
 export const createWebhooks = async (webhooks: Partial<WebhookConfiguration>[]) => {
   try {
-    // Make sure each webhook has the required 'url' field
     const validWebhooks = webhooks.filter(webhook => webhook.url);
     
     if (validWebhooks.length === 0) {
@@ -25,10 +22,8 @@ export const createWebhooks = async (webhooks: Partial<WebhookConfiguration>[]) 
   }
 };
 
-// Fix the createCompanies function to properly handle array inserts
 export const createCompanies = async (companies: Partial<Company>[]) => {
   try {
-    // Make sure each company has the required 'name' and 'slug' fields
     const validCompanies = companies.filter(company => company.name && company.slug);
     
     if (validCompanies.length === 0) {
@@ -48,10 +43,8 @@ export const createCompanies = async (companies: Partial<Company>[]) => {
   }
 };
 
-// Fix the createUsers function to properly handle array inserts
 export const createUsers = async (users: Partial<User>[]) => {
   try {
-    // Make sure each user has the required 'email', 'name', and 'role' fields
     const validUsers = users.filter(user => user.email && user.name && user.role);
     
     if (validUsers.length === 0) {
@@ -71,7 +64,6 @@ export const createUsers = async (users: Partial<User>[]) => {
   }
 };
 
-// Fix the getUserByAuth function to properly type the response
 export const getUserByAuth = async (authId: string): Promise<User | null> => {
   try {
     const { data, error } = await supabase
@@ -82,12 +74,11 @@ export const getUserByAuth = async (authId: string): Promise<User | null> => {
       
     if (error) {
       if (error.code === 'PGRST116') {
-        return null; // No user found
+        return null;
       }
       throw error;
     }
     
-    // Ensure tipo_usuario is correctly typed
     const user: User = {
       id: data.id,
       name: data.name,
@@ -106,8 +97,6 @@ export const getUserByAuth = async (authId: string): Promise<User | null> => {
   }
 };
 
-// Add additional API functions needed by the application
-// Professionals
 export const fetchProfessionals = async (): Promise<Professional[]> => {
   try {
     const { data, error } = await supabase
@@ -170,7 +159,6 @@ export const deleteProfessional = async (id: string): Promise<void> => {
   }
 };
 
-// Services
 export const fetchServices = async (): Promise<Service[]> => {
   try {
     const { data, error } = await supabase
@@ -233,7 +221,6 @@ export const deleteService = async (id: string): Promise<void> => {
   }
 };
 
-// Professional Services
 export const fetchProfessionalServices = async (professionalId: string): Promise<Service[]> => {
   try {
     const { data, error } = await supabase
@@ -290,7 +277,6 @@ export const dissociateProfessionalService = async (professionalId: string, serv
   }
 };
 
-// Available Slots
 export const fetchAvailableSlots = async (professionalId: string, date: Date): Promise<TimeSlot[]> => {
   try {
     const startOfDay = new Date(date);
@@ -310,7 +296,6 @@ export const fetchAvailableSlots = async (professionalId: string, date: Date): P
       
     if (error) throw error;
     
-    // Transform to TimeSlot format
     return (data || []).map(slot => ({
       id: slot.id,
       time: new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -354,31 +339,88 @@ export const fetchAllSlotsForProfessional = async (professionalId: string, date?
   }
 };
 
-export const createAvailableSlot = async (slot: any): Promise<any> => {
+export const createAvailableSlot = async (professionalId: string, startTime: Date, endTime: Date): Promise<any> => {
   try {
+    console.log('Creating slot:', { professionalId, startTime, endTime });
+    
+    const slotData = {
+      professional_id: professionalId,
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+      is_available: true
+    };
+    
     const { data, error } = await supabase
       .from('available_slots')
-      .insert(slot)
-      .select()
-      .single();
+      .insert(slotData)
+      .select();
       
     if (error) throw error;
-    return data;
+    return data ? data[0] : null;
   } catch (error) {
     console.error('Error creating available slot:', error);
     throw error;
   }
 };
 
-export const createAvailableSlotsBulk = async (slots: any[]): Promise<any[]> => {
+export const createAvailableSlotsBulk = async (
+  professionalId: string, 
+  startDate: Date, 
+  endDate: Date, 
+  selectedDays: number[],
+  timeRanges: Array<{startHour: string, startMinute: string, endHour: string, endMinute: string}>
+): Promise<{count: number}> => {
   try {
+    const slots = [];
+    let currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      if (selectedDays.includes(dayOfWeek)) {
+        for (const range of timeRanges) {
+          const slotStartTime = new Date(currentDate);
+          slotStartTime.setHours(
+            parseInt(range.startHour),
+            parseInt(range.startMinute),
+            0,
+            0
+          );
+          
+          const slotEndTime = new Date(currentDate);
+          slotEndTime.setHours(
+            parseInt(range.endHour),
+            parseInt(range.endMinute),
+            0,
+            0
+          );
+          
+          slots.push({
+            professional_id: professionalId,
+            start_time: slotStartTime.toISOString(),
+            end_time: slotEndTime.toISOString(),
+            is_available: true
+          });
+        }
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    console.log(`Creating ${slots.length} slots in bulk`);
+    
+    if (slots.length === 0) {
+      return { count: 0 };
+    }
+    
     const { data, error } = await supabase
       .from('available_slots')
       .insert(slots)
       .select();
       
     if (error) throw error;
-    return data || [];
+    
+    return { count: data?.length || 0 };
   } catch (error) {
     console.error('Error creating available slots in bulk:', error);
     throw error;
@@ -399,7 +441,6 @@ export const deleteAvailableSlot = async (id: string): Promise<void> => {
   }
 };
 
-// Appointments
 export const createAppointment = async (
   professionalId: string,
   serviceId: string,
@@ -408,7 +449,6 @@ export const createAppointment = async (
   clientPhone: string
 ): Promise<{ success: boolean; appointmentId?: string }> => {
   try {
-    // Prepare appointment data
     const appointmentData = {
       professional_id: professionalId,
       service_id: serviceId,
@@ -418,7 +458,6 @@ export const createAppointment = async (
       status: 'confirmed'
     };
     
-    // Create the appointment
     const { data, error } = await supabase
       .from('appointments')
       .insert(appointmentData)
@@ -427,7 +466,6 @@ export const createAppointment = async (
       
     if (error) throw error;
     
-    // Mark the slot as unavailable
     const { error: slotError } = await supabase
       .from('available_slots')
       .update({ is_available: false })
@@ -485,7 +523,6 @@ export const fetchAppointmentsByPhone = async (phone: string): Promise<Appointme
 
 export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed'): Promise<void> => {
   try {
-    // Get the current appointment to find the slot_id
     const { data: appointment, error: fetchError } = await supabase
       .from('appointments')
       .select('slot_id, status')
@@ -494,7 +531,6 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
       
     if (fetchError) throw fetchError;
     
-    // Update the appointment status
     const { error } = await supabase
       .from('appointments')
       .update({ status })
@@ -502,14 +538,17 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
       
     if (error) throw error;
     
-    // If the appointment is being cancelled, make the slot available again
     if (status === 'cancelled' && appointment.status !== 'cancelled') {
+      console.log('Making slot available again:', appointment.slot_id);
       const { error: slotError } = await supabase
         .from('available_slots')
         .update({ is_available: true })
         .eq('id', appointment.slot_id);
         
-      if (slotError) throw slotError;
+      if (slotError) {
+        console.error('Error making slot available again:', slotError);
+        throw slotError;
+      }
     }
   } catch (error) {
     console.error('Error updating appointment status:', error);
@@ -517,7 +556,6 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
   }
 };
 
-// Webhooks
 export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration[]> => {
   try {
     const { data, error } = await supabase
@@ -584,7 +622,6 @@ export const updateWebhookConfiguration = async (id: string, updates: Partial<We
 
 export const testWebhook = async (webhookId: string): Promise<{ success: boolean; message?: string }> => {
   try {
-    // Get the webhook URL and event type
     const { data: webhook, error: fetchError } = await supabase
       .from('webhook_configurations')
       .select('url, event_type')
@@ -593,7 +630,6 @@ export const testWebhook = async (webhookId: string): Promise<{ success: boolean
       
     if (fetchError) throw fetchError;
     
-    // Call the test-webhook edge function
     const { data, error } = await supabase.functions.invoke('test-webhook', {
       body: { url: webhook.url, event_type: webhook.event_type }
     });
@@ -607,7 +643,6 @@ export const testWebhook = async (webhookId: string): Promise<{ success: boolean
   }
 };
 
-// Companies
 export const fetchCompanies = async (): Promise<Company[]> => {
   try {
     const { data, error } = await supabase
@@ -656,7 +691,65 @@ export const updateCompany = async (id: string, company: Partial<Company>): Prom
   }
 };
 
-// Use instead of fetchUserByAuthId in Dashboard.tsx
 export const fetchUserByAuthId = async (authId: string): Promise<User | null> => {
   return getUserByAuth(authId);
+};
+
+// Function to create a user (admin) for a company
+export const createUserForCompany = async ({ 
+  email, 
+  password, 
+  name, 
+  companyId, 
+  role 
+}: { 
+  email: string;
+  password: string;
+  name: string;
+  companyId: string;
+  role: 'admin' | 'professional';
+}) => {
+  try {
+    // Step 1: Create the auth user
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    
+    if (authError) {
+      console.error('Error creating auth user:', authError);
+      throw authError;
+    }
+    
+    if (!authData.user) {
+      throw new Error('User creation failed');
+    }
+    
+    // Step 2: Create the user in the users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .insert({
+        auth_id: authData.user.id,
+        email,
+        name,
+        role,
+        tipo_usuario: 'admin', // All company admins have tipo_usuario = admin
+      })
+      .select()
+      .single();
+    
+    if (userError) {
+      console.error('Error creating user record:', userError);
+      throw userError;
+    }
+    
+    // Step 3: Link the user to the company in a new company_users table
+    // We'll need to create this table
+    
+    return userData;
+  } catch (error) {
+    console.error('Error in createUserForCompany:', error);
+    throw error;
+  }
 };

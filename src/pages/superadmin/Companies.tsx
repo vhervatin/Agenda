@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,13 +12,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchCompanies, createCompany, updateCompany } from '@/services/api';
+import { fetchCompanies, createCompany, updateCompany, createUserForCompany } from '@/services/api';
 import { 
   Building2, 
   Pencil, 
   Check, 
   X, 
-  CalendarIcon,
+  CalendarIcon, 
   Hash, 
   CreditCard, 
   Mail, 
@@ -25,7 +26,9 @@ import {
   PlusCircle, 
   Loader2,
   CalendarDays,
-  Upload
+  Upload,
+  UserIcon,
+  Lock
 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -186,11 +189,23 @@ const CompanyFormDialog: React.FC<CompanyFormDialogProps> = ({ isOpen, onClose, 
   const [planValue, setPlanValue] = useState(0);
   const [expiryDate, setExpiryDate] = useState<Date | null>(null);
   const [isActive, setIsActive] = useState(true);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const handleSubmit = async () => {
     if (!name || !slug) {
-      toast.error('Por favor, preencha todos os campos obrigatórios.');
+      toast.error('Por favor, preencha os campos obrigatórios da empresa.');
+      return;
+    }
+    
+    if (!adminEmail || !adminPassword) {
+      toast.error('Por favor, forneça o email e senha do administrador da empresa.');
+      return;
+    }
+    
+    if (adminPassword.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
     
@@ -209,9 +224,20 @@ const CompanyFormDialog: React.FC<CompanyFormDialogProps> = ({ isOpen, onClose, 
     };
     
     try {
-      await createCompanyMutation.mutateAsync(companyData);
+      // First create the company
+      const createdCompany = await createCompanyMutation.mutateAsync(companyData);
+      
+      // Then create the admin user for this company
+      await createUserForCompany({
+        email: adminEmail,
+        password: adminPassword,
+        name: `Admin ${name}`,
+        companyId: createdCompany.id,
+        role: 'admin'
+      });
+      
       onClose();
-      toast.success('Empresa criada com sucesso!');
+      toast.success('Empresa e usuário administrador criados com sucesso!');
     } catch (error: any) {
       toast.error(`Erro ao criar empresa: ${error.message || 'Unknown error'}`);
     } finally {
@@ -229,118 +255,154 @@ const CompanyFormDialog: React.FC<CompanyFormDialogProps> = ({ isOpen, onClose, 
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input
-              id="name"
-              placeholder="Nome da empresa"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
+        <Tabs defaultValue="company">
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="company">Dados da Empresa</TabsTrigger>
+            <TabsTrigger value="admin">Administrador</TabsTrigger>
+          </TabsList>
           
-          <div className="space-y-2">
-            <Label htmlFor="slug">Slug</Label>
-            <Input
-              id="slug"
-              placeholder="Slug da empresa"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="logoUrl">URL do Logo</Label>
-            <Input
-              id="logoUrl"
-              placeholder="URL do logo da empresa"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="primaryColor">Cor Primária</Label>
-            <Input
-              id="primaryColor"
-              placeholder="Cor primária da empresa"
-              value={primaryColor}
-              onChange={(e) => setPrimaryColor(e.target.value)}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="secondaryColor">Cor Secundária</Label>
-            <Input
-              id="secondaryColor"
-              placeholder="Cor secundária da empresa"
-              value={secondaryColor}
-              onChange={(e) => setSecondaryColor(e.target.value)}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="plan">Plano</Label>
-            <Select onValueChange={setPlan}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione um plano" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="basic">Básico</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
-                <SelectItem value="enterprise">Enterprise</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="planValue">Valor do Plano</Label>
-            <Input
-              id="planValue"
-              type="number"
-              placeholder="Valor do plano"
-              value={planValue}
-              onChange={(e) => setPlanValue(Number(e.target.value))}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="expiryDate">Data de Expiração do Plano</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={`w-full justify-start text-left font-normal ${!expiryDate && 'text-muted-foreground'}`}
-                >
-                  <CalendarDays className="mr-2 h-4 w-4" />
-                  {expiryDate ? format(expiryDate, 'PPP', { locale: ptBR }) : <span>Selecione uma data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={expiryDate}
-                  onSelect={setExpiryDate}
-                  initialFocus
-                  disabled={(date) => date < new Date()}
-                  locale={ptBR}
+          <TabsContent value="company" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome*</Label>
+                <Input
+                  id="name"
+                  placeholder="Nome da empresa"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
                 />
-              </PopoverContent>
-            </Popover>
-          </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="slug">Slug*</Label>
+                <Input
+                  id="slug"
+                  placeholder="Slug da empresa"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="logoUrl">URL do Logo</Label>
+                <Input
+                  id="logoUrl"
+                  placeholder="URL do logo da empresa"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="primaryColor">Cor Primária</Label>
+                <Input
+                  id="primaryColor"
+                  placeholder="Cor primária da empresa"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="secondaryColor">Cor Secundária</Label>
+                <Input
+                  id="secondaryColor"
+                  placeholder="Cor secundária da empresa"
+                  value={secondaryColor}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="plan">Plano</Label>
+                <Select value={plan} onValueChange={setPlan}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione um plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">Básico</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="planValue">Valor do Plano</Label>
+                <Input
+                  id="planValue"
+                  type="number"
+                  placeholder="Valor do plano"
+                  value={planValue}
+                  onChange={(e) => setPlanValue(Number(e.target.value))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="expiryDate">Data de Expiração do Plano</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={`w-full justify-start text-left font-normal ${!expiryDate && 'text-muted-foreground'}`}
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {expiryDate ? format(expiryDate, 'PPP', { locale: ptBR }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={expiryDate}
+                      onSelect={setExpiryDate}
+                      initialFocus
+                      disabled={(date) => date < new Date()}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="isActive">Ativa</Label>
+                <Switch
+                  id="isActive"
+                  checked={isActive}
+                  onCheckedChange={setIsActive}
+                />
+              </div>
+            </div>
+          </TabsContent>
           
-          <div className="space-y-2">
-            <Label htmlFor="isActive">Ativa</Label>
-            <Switch
-              id="isActive"
-              checked={isActive}
-              onCheckedChange={setIsActive}
-            />
-          </div>
-        </div>
+          <TabsContent value="admin" className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="adminEmail">Email do Administrador*</Label>
+              <Input
+                id="adminEmail"
+                type="email"
+                placeholder="admin@empresa.com"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="adminPassword">Senha do Administrador*</Label>
+              <Input
+                id="adminPassword"
+                type="password"
+                placeholder="Senha"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">A senha deve ter pelo menos 6 caracteres</p>
+            </div>
+          </TabsContent>
+        </Tabs>
         
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={onClose}>
