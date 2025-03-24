@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { CalendarDays, Clock, Scissors, User, Phone, CreditCard } from 'lucide-react';
+import { CalendarDays, Clock, ClipboardList, User, Phone, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -52,7 +51,7 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
       <CardContent className="space-y-4">
         <div className="flex items-start space-x-3">
           <div className="rounded-full p-2 bg-primary/10">
-            <Scissors className="h-4 w-4 text-primary" />
+            <ClipboardList className="h-4 w-4 text-primary" />
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Serviço</p>

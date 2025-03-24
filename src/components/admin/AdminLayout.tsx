@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
-  Scissors, 
+  ClipboardList, 
   Calendar, 
   CalendarClock, 
   Settings, 
@@ -76,7 +77,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     },
     {
       href: '/admin/services',
-      icon: <Scissors className="h-5 w-5" />,
+      icon: <ClipboardList className="h-5 w-5" />,
       text: 'Serviços'
     },
     {
