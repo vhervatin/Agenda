@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ const Booking = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientCpf, setClientCpf] = useState('');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -93,7 +95,7 @@ const Booking = () => {
   };
   
   const handleConfirmAppointment = () => {
-    if (!selectedProfessional || !selectedService || !selectedTimeSlot || !clientName || !clientPhone) {
+    if (!selectedProfessional || !selectedService || !selectedTimeSlot || !clientName || !clientPhone || !clientCpf) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
@@ -105,7 +107,8 @@ const Booking = () => {
       selectedService,
       selectedTimeSlot,
       clientName,
-      clientPhone
+      clientPhone,
+      clientCpf
     )
       .then(result => {
         setIsSubmitting(false);
@@ -129,7 +132,7 @@ const Booking = () => {
       case 1: return !!selectedService;
       case 2: return !!selectedDate;
       case 3: return !!selectedTimeSlot;
-      case 4: return !!clientName && !!clientPhone;
+      case 4: return !!clientName && !!clientPhone && !!clientCpf;
       default: return true;
     }
   };
@@ -242,8 +245,10 @@ const Booking = () => {
           <ClientInfoForm
             clientName={clientName}
             clientPhone={clientPhone}
+            clientCpf={clientCpf}
             onClientNameChange={setClientName}
             onClientPhoneChange={setClientPhone}
+            onClientCpfChange={setClientCpf}
           />
         );
       case 5:
@@ -260,6 +265,7 @@ const Booking = () => {
               professionalName={selectedProfessionalObject?.name || ''}
               clientName={clientName}
               clientPhone={clientPhone}
+              clientCpf={clientCpf}
               onConfirm={handleConfirmAppointment}
               onEdit={() => setCurrentStep(0)}
               isSubmitting={isSubmitting}

@@ -37,6 +37,7 @@ export interface Appointment {
   slot_id: string;
   client_name: string;
   client_phone: string;
+  client_cpf?: string;
   status: 'confirmed' | 'cancelled' | 'completed';
   created_at?: string;
   services?: Service;

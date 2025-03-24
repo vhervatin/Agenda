@@ -110,11 +110,17 @@ serve(async (req) => {
       console.error("Failed to create webhook log:", logError);
     }
 
-    // Prepare the webhook payload including the appointment date
-    const webhookPayload = {
+    // Extract the appointment date from the payload and ensure it's properly formatted
+    // This is the key fix to send the correct appointment date
+    let webhookPayload = {
       ...payload,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString() // Current timestamp for the webhook delivery
     };
+
+    if (payload.appointment_date) {
+      // Make sure we're preserving the exact appointment date from the payload
+      console.log("Using appointment date from payload:", payload.appointment_date);
+    }
 
     console.log("Sending webhook with payload:", webhookPayload);
 

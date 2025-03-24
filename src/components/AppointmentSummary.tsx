@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CalendarDays, Clock, Scissors, User, Phone } from 'lucide-react';
+import { CalendarDays, Clock, Scissors, User, Phone, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -15,6 +15,7 @@ interface AppointmentSummaryProps {
   professionalName?: string;
   clientName?: string;
   clientPhone?: string;
+  clientCpf?: string;
   onConfirm: () => void;
   onEdit: () => void;
   isSubmitting?: boolean;
@@ -27,6 +28,7 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
   professionalName,
   clientName,
   clientPhone,
+  clientCpf,
   onConfirm,
   onEdit,
   isSubmitting = false
@@ -87,15 +89,26 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
           </div>
         </div>
 
-        {(clientName || clientPhone) && (
+        {(clientName || clientPhone || clientCpf) && (
           <div className="flex items-start space-x-3">
             <div className="rounded-full p-2 bg-primary/10">
-              <Phone className="h-4 w-4 text-primary" />
+              <User className="h-4 w-4 text-primary" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Seus dados</p>
               <p className="font-medium">{clientName}</p>
-              {clientPhone && <p className="text-sm text-muted-foreground mt-1">{clientPhone}</p>}
+              {clientPhone && (
+                <div className="flex items-center mt-1 text-sm text-muted-foreground">
+                  <Phone className="h-3 w-3 mr-1" />
+                  <span>{clientPhone}</span>
+                </div>
+              )}
+              {clientCpf && (
+                <div className="flex items-center mt-1 text-sm text-muted-foreground">
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  <span>{clientCpf}</span>
+                </div>
+              )}
             </div>
           </div>
         )}
