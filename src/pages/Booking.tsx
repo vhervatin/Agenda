@@ -15,19 +15,21 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { 
   fetchProfessionals, 
-  fetchProfessionalServices, 
+  fetchProfessionalServices,
+  fetchServiceProfessionals, 
   fetchAvailableSlots,
   createAppointment 
 } from '@/services/api';
 import { Professional, Service, TimeSlot } from '@/types/types';
 
-const STEPS = ["Profissional", "Serviço", "Data", "Horário", "Dados", "Confirmação"];
+// Updated step order: Service, Professional, Date, Time, Client Info, Confirmation
+const STEPS = ["Serviço", "Profissional", "Data", "Horário", "Dados", "Confirmação"];
 
 const Booking = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
-  const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
@@ -36,22 +38,24 @@ const Booking = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { 
-    data: professionals = [], 
-    isLoading: isLoadingProfessionals,
-    error: professionalsError
-  } = useQuery({
-    queryKey: ['professionals'],
-    queryFn: fetchProfessionals
-  });
-  
+  // First we fetch all services
   const { 
     data: services = [], 
     isLoading: isLoadingServices,
+    error: servicesError
   } = useQuery({
-    queryKey: ['services', selectedProfessional],
-    queryFn: () => selectedProfessional ? fetchProfessionalServices(selectedProfessional) : Promise.resolve([]),
-    enabled: !!selectedProfessional
+    queryKey: ['services'],
+    queryFn: () => fetchProfessionalServices()
+  });
+  
+  // Then fetch professionals for the selected service
+  const { 
+    data: professionals = [], 
+    isLoading: isLoadingProfessionals,
+  } = useQuery({
+    queryKey: ['professionals', selectedService],
+    queryFn: () => selectedService ? fetchServiceProfessionals(selectedService) : Promise.resolve([]),
+    enabled: !!selectedService
   });
   
   useEffect(() => {
@@ -67,6 +71,11 @@ const Booking = () => {
         });
     }
   }, [selectedProfessional, selectedDate]);
+
+  // When service changes, reset professional
+  useEffect(() => {
+    setSelectedProfessional(null);
+  }, [selectedService]);
   
   const selectedProfessionalObject = selectedProfessional 
     ? professionals.find(prof => prof.id === selectedProfessional) || null
@@ -128,8 +137,8 @@ const Booking = () => {
   
   const isCurrentStepValid = () => {
     switch (currentStep) {
-      case 0: return !!selectedProfessional;
-      case 1: return !!selectedService;
+      case 0: return !!selectedService;
+      case 1: return !!selectedProfessional;
       case 2: return !!selectedDate;
       case 3: return !!selectedTimeSlot;
       case 4: return !!clientName && !!clientPhone && !!clientCpf;
@@ -161,44 +170,16 @@ const Booking = () => {
       case 0:
         return (
           <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold mb-4">Escolha um profissional</h2>
-            
-            {isLoadingProfessionals ? (
-              <div className="text-center py-8">Carregando profissionais...</div>
-            ) : professionalsError ? (
-              <div className="text-center py-8 text-destructive">
-                Erro ao carregar profissionais. Por favor, tente novamente.
-              </div>
-            ) : professionals.length === 0 ? (
-              <div className="text-center py-8">Nenhum profissional disponível no momento.</div>
-            ) : (
-              <div className="grid md:grid-cols-2 gap-4">
-                {professionals.map((professional) => (
-                  <ProfessionalItem
-                    key={professional.id}
-                    id={professional.id}
-                    name={professional.name}
-                    photoUrl={professional.photo_url}
-                    bio={professional.bio}
-                    selected={professional.id === selectedProfessional}
-                    onSelect={setSelectedProfessional}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      case 1:
-        return (
-          <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha um serviço</h2>
             
             {isLoadingServices ? (
               <div className="text-center py-8">Carregando serviços...</div>
-            ) : services.length === 0 ? (
-              <div className="text-center py-8">
-                Nenhum serviço disponível para este profissional.
+            ) : servicesError ? (
+              <div className="text-center py-8 text-destructive">
+                Erro ao carregar serviços. Por favor, tente novamente.
               </div>
+            ) : services.length === 0 ? (
+              <div className="text-center py-8">Nenhum serviço disponível no momento.</div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
                 {services.map((service) => (
@@ -211,6 +192,34 @@ const Booking = () => {
                     description={service.description}
                     selected={service.id === selectedService}
                     onSelect={setSelectedService}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 1:
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <h2 className="text-2xl font-bold mb-4">Escolha um profissional</h2>
+            
+            {isLoadingProfessionals ? (
+              <div className="text-center py-8">Carregando profissionais...</div>
+            ) : professionals.length === 0 ? (
+              <div className="text-center py-8">
+                Nenhum profissional disponível para este serviço.
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-4">
+                {professionals.map((professional) => (
+                  <ProfessionalItem
+                    key={professional.id}
+                    id={professional.id}
+                    name={professional.name}
+                    photoUrl={professional.photo_url}
+                    bio={professional.bio}
+                    selected={professional.id === selectedProfessional}
+                    onSelect={setSelectedProfessional}
                   />
                 ))}
               </div>

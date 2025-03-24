@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Professional, 
@@ -30,33 +29,55 @@ export const fetchProfessionals = async (): Promise<Professional[]> => {
 };
 
 // Function to fetch professional services
-export const fetchProfessionalServices = async (professionalId: string): Promise<Service[]> => {
+export const fetchProfessionalServices = async (): Promise<Service[]> => {
   try {
     const { data, error } = await supabase
-      .from('professional_services')
-      .select('service_id')
-      .eq('professional_id', professionalId);
+      .from('services')
+      .select('*')
+      .eq('active', true)
+      .order('name');
       
     if (error) throw error;
     
-    if (!data || data.length === 0) {
+    return data as Service[];
+  } catch (error) {
+    console.error('Error fetching services:', error);
+    return [];
+  }
+};
+
+// Function to fetch professionals who offer a specific service
+export const fetchServiceProfessionals = async (serviceId: string): Promise<Professional[]> => {
+  try {
+    // First get all professional_ids that offer this service
+    const { data: professionalServices, error: psError } = await supabase
+      .from('professional_services')
+      .select('professional_id')
+      .eq('service_id', serviceId);
+      
+    if (psError) throw psError;
+    
+    if (!professionalServices.length) {
       return [];
     }
     
-    const serviceIds = data.map(item => item.service_id);
+    // Extract the professional IDs
+    const professionalIds = professionalServices.map(ps => ps.professional_id);
     
-    const { data: servicesData, error: servicesError } = await supabase
-      .from('services')
+    // Then fetch the professionals with those IDs
+    const { data: professionals, error: profError } = await supabase
+      .from('professionals')
       .select('*')
-      .in('id', serviceIds)
-      .eq('active', true);
+      .in('id', professionalIds)
+      .eq('active', true)
+      .order('name');
       
-    if (servicesError) throw servicesError;
+    if (profError) throw profError;
     
-    return servicesData || [];
+    return professionals as Professional[];
   } catch (error) {
-    console.error('Error fetching professional services:', error);
-    throw error;
+    console.error('Error fetching professionals for service:', error);
+    return [];
   }
 };
 
