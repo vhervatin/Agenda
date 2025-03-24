@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       appointments: {
         Row: {
+          client_cpf: string | null
           client_name: string
           client_phone: string
           created_at: string | null
@@ -22,6 +23,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          client_cpf?: string | null
           client_name: string
           client_phone: string
           created_at?: string | null
@@ -33,6 +35,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          client_cpf?: string | null
           client_name?: string
           client_phone?: string
           created_at?: string | null
