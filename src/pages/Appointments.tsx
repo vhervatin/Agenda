@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, Plus, Trash2, Search, Phone } from 'lucide-react';
+import { Calendar, Clock, Plus, Trash2, Search, CreditCard } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import NavBar from '@/components/NavBar';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { fetchAppointmentsByPhone, updateAppointmentStatus } from '@/services/api';
+import { fetchAppointmentsByCpf, updateAppointmentStatus } from '@/services/api';
 import { supabase } from '@/integrations/supabase/client';
 
 const AppointmentCard = ({ 
@@ -122,25 +122,47 @@ const AppointmentCard = ({
   );
 };
 
-const PhoneEntryForm = ({ onSubmit }: { onSubmit: (phone: string) => void }) => {
-  const [phone, setPhone] = useState('');
+const CPFEntryForm = ({ onSubmit }: { onSubmit: (cpf: string) => void }) => {
+  const [cpf, setCpf] = useState('');
   const [error, setError] = useState('');
+
+  const formatCpf = (value: string): string => {
+    // Remove tudo que não for dígito
+    const digits = value.replace(/\D/g, '');
+    
+    // Aplicar a formatação 000.000.000-00
+    if (digits.length <= 3) {
+      return digits;
+    } else if (digits.length <= 6) {
+      return `${digits.substring(0, 3)}.${digits.substring(3)}`;
+    } else if (digits.length <= 9) {
+      return `${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6)}`;
+    } else {
+      return `${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9, 11)}`;
+    }
+  };
+
+  const handleCpfChange = (value: string) => {
+    const formattedCpf = formatCpf(value);
+    setCpf(formattedCpf);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!phone) {
-      setError('Por favor, digite seu telefone');
+    if (!cpf) {
+      setError('Por favor, digite seu CPF');
       return;
     }
     
-    if (phone.length > 15) {
-      setError('O telefone não pode ter mais de 15 caracteres');
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) {
+      setError('CPF inválido. Digite os 11 dígitos do CPF');
       return;
     }
     
     setError('');
-    onSubmit(phone);
+    onSubmit(cpf);
   };
 
   return (
@@ -151,21 +173,21 @@ const PhoneEntryForm = ({ onSubmit }: { onSubmit: (phone: string) => void }) => 
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="phone">Informe seu número de telefone</Label>
+            <Label htmlFor="cpf">Informe seu CPF</Label>
             <Input
-              id="phone"
-              placeholder="(00) 00000-0000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              maxLength={15}
+              id="cpf"
+              placeholder="000.000.000-00"
+              value={cpf}
+              onChange={(e) => handleCpfChange(e.target.value)}
+              maxLength={14}
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <p className="text-xs text-muted-foreground">
-              Digite o mesmo número de telefone usado no agendamento.
+              Digite o mesmo CPF usado no agendamento.
             </p>
           </div>
           <Button type="submit" className="w-full">
-            <Phone className="mr-2 h-4 w-4" />
+            <CreditCard className="mr-2 h-4 w-4" />
             Buscar Agendamentos
           </Button>
         </form>
@@ -176,21 +198,21 @@ const PhoneEntryForm = ({ onSubmit }: { onSubmit: (phone: string) => void }) => 
 
 const Appointments = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [clientCpf, setClientCpf] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
   
   const queryClient = useQueryClient();
   
-  // Query to fetch appointments by phone number
+  // Query to fetch appointments by CPF
   const { 
     data: fetchedAppointments,
     isLoading,
     isError,
     refetch 
   } = useQuery({
-    queryKey: ['appointments', phoneNumber],
-    queryFn: () => phoneNumber ? fetchAppointmentsByPhone(phoneNumber) : Promise.resolve([]),
-    enabled: !!phoneNumber
+    queryKey: ['appointments', clientCpf],
+    queryFn: () => clientCpf ? fetchAppointmentsByCpf(clientCpf) : Promise.resolve([]),
+    enabled: !!clientCpf
   });
   
   // Mutation for cancelling appointment
@@ -199,7 +221,7 @@ const Appointments = () => {
       return await updateAppointmentStatus(appointmentId, 'cancelled');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['appointments', phoneNumber] });
+      queryClient.invalidateQueries({ queryKey: ['appointments', clientCpf] });
       toast.success("Agendamento cancelado com sucesso!");
     },
     onError: (error) => {
@@ -253,14 +275,14 @@ const Appointments = () => {
     return appointmentDate ? appointmentDate <= now : false;
   });
 
-  // If no phone number provided yet, show the phone entry form
-  if (!phoneNumber) {
+  // If no CPF provided yet, show the CPF entry form
+  if (!clientCpf) {
     return (
       <div className="min-h-screen flex flex-col">
         <NavBar />
         
         <main className="flex-1 container mx-auto px-4 py-12 flex items-center justify-center">
-          <PhoneEntryForm onSubmit={setPhoneNumber} />
+          <CPFEntryForm onSubmit={setClientCpf} />
         </main>
       </div>
     );
@@ -313,12 +335,12 @@ const Appointments = () => {
             <>
               <div className="mb-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
                 <p className="text-sm">
-                  Telefone: <span className="font-medium">{phoneNumber}</span>
+                  CPF: <span className="font-medium">{clientCpf}</span>
                 </p>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => setPhoneNumber(null)}
+                  onClick={() => setClientCpf(null)}
                 >
                   Alterar
                 </Button>
@@ -349,7 +371,7 @@ const Appointments = () => {
                       <p className="text-muted-foreground mb-6">
                         {searchQuery 
                           ? "Tente buscar usando outros termos." 
-                          : "Você não possui agendamentos futuros para este número de telefone."}
+                          : "Você não possui agendamentos futuros para este CPF."}
                       </p>
                       <Button asChild>
                         <Link to="/booking">
@@ -377,7 +399,7 @@ const Appointments = () => {
                       <p className="text-muted-foreground">
                         {searchQuery 
                           ? "Tente buscar usando outros termos." 
-                          : "Você não possui agendamentos anteriores para este número de telefone."}
+                          : "Você não possui agendamentos anteriores para este CPF."}
                       </p>
                     </div>
                   )}
