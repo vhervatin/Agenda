@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -22,7 +21,6 @@ import {
 } from '@/services/api';
 import { Professional, Service, TimeSlot } from '@/types/types';
 
-// Updated step order: Service, Professional, Date, Time, Client Info, Confirmation
 const STEPS = ["Serviço", "Profissional", "Data", "Horário", "Dados", "Confirmação"];
 
 const Booking = () => {
@@ -37,8 +35,8 @@ const Booking = () => {
   const [clientCpf, setClientCpf] = useState('');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cpfIsValid, setCpfIsValid] = useState(true);
   
-  // First we fetch all services
   const { 
     data: services = [], 
     isLoading: isLoadingServices,
@@ -48,7 +46,6 @@ const Booking = () => {
     queryFn: () => fetchProfessionalServices()
   });
   
-  // Then fetch professionals for the selected service
   const { 
     data: professionals = [], 
     isLoading: isLoadingProfessionals,
@@ -72,9 +69,10 @@ const Booking = () => {
     }
   }, [selectedProfessional, selectedDate]);
 
-  // When service changes, reset professional
   useEffect(() => {
-    setSelectedProfessional(null);
+    if (selectedProfessional) {
+      setSelectedProfessional(null);
+    }
   }, [selectedService]);
   
   const selectedProfessionalObject = selectedProfessional 
@@ -103,9 +101,66 @@ const Booking = () => {
     }
   };
   
+  const isValidCpf = (cpf: string): boolean => {
+    const cleanCpf = cpf.replace(/\D/g, '');
+    
+    if (cleanCpf.length !== 11) {
+      return false;
+    }
+    
+    if (/^(\d)\1+$/.test(cleanCpf)) {
+      return false;
+    }
+    
+    let sum = 0;
+    let remainder;
+    
+    for (let i = 1; i <= 9; i++) {
+      sum += parseInt(cleanCpf.substring(i - 1, i)) * (11 - i);
+    }
+    
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) {
+      remainder = 0;
+    }
+    
+    if (remainder !== parseInt(cleanCpf.substring(9, 10))) {
+      return false;
+    }
+    
+    sum = 0;
+    for (let i = 1; i <= 10; i++) {
+      sum += parseInt(cleanCpf.substring(i - 1, i)) * (12 - i);
+    }
+    
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) {
+      remainder = 0;
+    }
+    
+    if (remainder !== parseInt(cleanCpf.substring(10, 11))) {
+      return false;
+    }
+    
+    return true;
+  };
+  
+  useEffect(() => {
+    if (clientCpf && clientCpf.replace(/\D/g, '').length === 11) {
+      setCpfIsValid(isValidCpf(clientCpf));
+    } else {
+      setCpfIsValid(true);
+    }
+  }, [clientCpf]);
+  
   const handleConfirmAppointment = () => {
     if (!selectedProfessional || !selectedService || !selectedTimeSlot || !clientName || !clientPhone || !clientCpf) {
       toast.error("Por favor, preencha todos os campos");
+      return;
+    }
+    
+    if (!cpfIsValid) {
+      toast.error("Por favor, insira um CPF válido");
       return;
     }
     
@@ -141,7 +196,7 @@ const Booking = () => {
       case 1: return !!selectedProfessional;
       case 2: return !!selectedDate;
       case 3: return !!selectedTimeSlot;
-      case 4: return !!clientName && !!clientPhone && !!clientCpf;
+      case 4: return !!clientName && !!clientPhone && !!clientCpf && clientCpf.replace(/\D/g, '').length === 11 && cpfIsValid;
       default: return true;
     }
   };

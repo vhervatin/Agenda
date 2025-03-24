@@ -21,6 +21,8 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
   onClientPhoneChange,
   onClientCpfChange
 }) => {
+  const [cpfError, setCpfError] = useState<string | null>(null);
+
   const handleNameChange = (value: string) => {
     if (value.length > 50) {
       toast.warning("O nome não pode ter mais de 50 caracteres");
@@ -51,6 +53,56 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
     onClientPhoneChange(formattedPhone);
   };
 
+  const isValidCpf = (cpf: string): boolean => {
+    // Remove everything that's not a digit
+    const cleanCpf = cpf.replace(/\D/g, '');
+    
+    // Check length
+    if (cleanCpf.length !== 11) {
+      return false;
+    }
+    
+    // Check for all repeated digits
+    if (/^(\d)\1+$/.test(cleanCpf)) {
+      return false;
+    }
+    
+    // Validation algorithm
+    let sum = 0;
+    let remainder;
+    
+    // First digit validation
+    for (let i = 1; i <= 9; i++) {
+      sum += parseInt(cleanCpf.substring(i - 1, i)) * (11 - i);
+    }
+    
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) {
+      remainder = 0;
+    }
+    
+    if (remainder !== parseInt(cleanCpf.substring(9, 10))) {
+      return false;
+    }
+    
+    // Second digit validation
+    sum = 0;
+    for (let i = 1; i <= 10; i++) {
+      sum += parseInt(cleanCpf.substring(i - 1, i)) * (12 - i);
+    }
+    
+    remainder = (sum * 10) % 11;
+    if (remainder === 10 || remainder === 11) {
+      remainder = 0;
+    }
+    
+    if (remainder !== parseInt(cleanCpf.substring(10, 11))) {
+      return false;
+    }
+    
+    return true;
+  };
+
   const formatCpf = (value: string): string => {
     // Remove tudo que não for dígito
     const digits = value.replace(/\D/g, '');
@@ -73,7 +125,23 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
       toast.warning("O CPF não pode ter mais de 11 dígitos");
       return;
     }
+    
     onClientCpfChange(formattedCpf);
+    
+    // Clear error if CPF is empty or incomplete
+    if (formattedCpf.replace(/\D/g, '').length < 11) {
+      setCpfError(null);
+      return;
+    }
+    
+    // Validate CPF when all 11 digits are entered
+    if (formattedCpf.replace(/\D/g, '').length === 11) {
+      if (!isValidCpf(formattedCpf)) {
+        setCpfError("CPF inválido");
+      } else {
+        setCpfError(null);
+      }
+    }
   };
 
   return (
@@ -120,7 +188,11 @@ const ClientInfoForm: React.FC<ClientInfoFormProps> = ({
           onChange={(e) => handleCpfChange(e.target.value)}
           maxLength={14}
           required
+          className={cpfError ? "border-red-500" : ""}
         />
+        {cpfError && (
+          <p className="text-xs text-red-500">{cpfError}</p>
+        )}
         <p className="text-xs text-muted-foreground text-right">
           {clientCpf.length}/14 caracteres
         </p>
