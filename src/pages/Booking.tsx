@@ -13,8 +13,7 @@ import AppointmentSummary from '@/components/AppointmentSummary';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { 
-  fetchProfessionals, 
-  fetchProfessionalServices,
+  fetchProfessionalServices, 
   fetchServiceProfessionals, 
   fetchAvailableSlots,
   createAppointment 
@@ -176,12 +175,8 @@ const Booking = () => {
     )
       .then(result => {
         setIsSubmitting(false);
-        if (result.success && result.appointmentId) {
-          toast.success("Agendamento confirmado com sucesso!");
-          navigate(`/appointment-success?id=${result.appointmentId}`);
-        } else {
-          toast.error("Não foi possível confirmar seu agendamento. Por favor, tente novamente.");
-        }
+        toast.success("Agendamento confirmado com sucesso!");
+        navigate(`/appointment-success?id=${result.id}`);
       })
       .catch((error) => {
         console.error("Error creating appointment:", error);
