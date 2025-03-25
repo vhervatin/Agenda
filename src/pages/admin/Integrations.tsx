@@ -33,6 +33,7 @@ const Integrations = () => {
   const [selectedEventType, setSelectedEventType] = useState('appointment_created');
   const [testEventType, setTestEventType] = useState('appointment_created');
   const [isTesting, setIsTesting] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
   
   // Fetch webhook configurations
   const { data: webhookConfigurations = [], isLoading: isLoadingConfigurations } = useQuery({
@@ -114,11 +115,16 @@ const Integrations = () => {
     });
   };
   
-  const handleTestWebhook = () => {
-    if (!selectedWebhook) return;
-    
-    setIsTesting(true);
-    testWebhookMutation.mutate(selectedWebhook.id);
+  const handleTestWebhook = async (id: string) => {
+    try {
+      setTestingWebhook(id);
+      const result = await testWebhook(id);
+      toast.success('Webhook testado com sucesso!');
+    } catch (error: any) {
+      toast.error(`Erro ao testar webhook: ${error.message}`);
+    } finally {
+      setTestingWebhook(null);
+    }
   };
   
   const openTestDialog = (webhook: WebhookConfig) => {
@@ -464,7 +470,7 @@ const Integrations = () => {
               <Button variant="outline">Cancelar</Button>
             </DialogClose>
             <Button 
-              onClick={handleTestWebhook}
+              onClick={() => handleTestWebhook(selectedWebhook.id)}
               disabled={isTesting}
             >
               {isTesting ? 'Enviando...' : 'Enviar Teste'}

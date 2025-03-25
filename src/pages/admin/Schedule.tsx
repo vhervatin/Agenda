@@ -1,604 +1,284 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, Plus, Clock, CalendarDays } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar } from '@/components/ui/calendar';
+import { CheckCircle, XCircle, RotateCcw, Clock } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TimeSlot, Professional } from '@/types/types';
-import { format, parseISO, set, addDays } from 'date-fns';
+import { format, parseISO, isToday, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
+  fetchAppointments, 
   fetchProfessionals,
-  fetchAllSlotsForProfessional,
-  createAvailableSlot,
-  createAvailableSlotsBulk,
-  deleteAvailableSlot
+  updateAppointmentStatus,
+  createAvailableSlotsBulk
 } from '@/services/api';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+const BulkScheduleFormSchema = z.object({
+  professionalId: z.string().min(1, {
+    message: "Selecione um profissional",
+  }),
+  startDate: z.date({
+    required_error: "Uma data de início é necessária.",
+  }),
+  endDate: z.date({
+    required_error: "Uma data de término é necessária.",
+  }),
+  days: z.array(z.number()).refine((value) => value.some((item) => item), {
+    message: "Selecione pelo menos um dia.",
+  }),
+  timeRanges: z.array(
+    z.object({
+      startHour: z.string().min(1, {
+        message: "Hora de início é necessária.",
+      }),
+      startMinute: z.string().min(1, {
+        message: "Minuto de início é necessário.",
+      }),
+      endHour: z.string().min(1, {
+        message: "Hora de término é necessária.",
+      }),
+      endMinute: z.string().min(1, {
+        message: "Minuto de término é necessário.",
+      }),
+    })
+  ).min(1, {
+    message: "Adicione pelo menos um horário.",
+  }),
+});
+
+type BulkScheduleFormValues = z.infer<typeof BulkScheduleFormSchema>;
+
+const daysOfWeek = [
+  { value: 0, label: 'Domingo' },
+  { value: 1, label: 'Segunda-feira' },
+  { value: 2, label: 'Terça-feira' },
+  { value: 3, label: 'Quarta-feira' },
+  { value: 4, label: 'Quinta-feira' },
+  { value: 5, label: 'Sexta-feira' },
+  { value: 6, label: 'Sábado' },
+];
 
 const Schedule = () => {
   const queryClient = useQueryClient();
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<'confirmed' | 'cancelled' | 'completed'>('confirmed');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isAddBulkDialogOpen, setIsAddBulkDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [addMode, setAddMode] = useState<'single' | 'bulk'>('single');
-  
-  // Single time slot form state
-  const [startHour, setStartHour] = useState('09');
-  const [startMinute, setStartMinute] = useState('00');
-  const [endHour, setEndHour] = useState('10');
-  const [endMinute, setEndMinute] = useState('00');
-  
-  // Bulk time slot form state
-  const [bulkStartDate, setBulkStartDate] = useState<Date>(new Date());
-  const [bulkEndDate, setBulkEndDate] = useState<Date>(addDays(new Date(), 30));
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri by default
-  const [timeRanges, setTimeRanges] = useState([
-    { startHour: '09', startMinute: '00', endHour: '10', endMinute: '00' }
-  ]);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [isBulkModalOpen, setBulkModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   
   // Fetch professionals
-  const { data: professionals = [], isLoading: isLoadingProfessionals } = useQuery({
+  const { data: professionals = [] } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
   
-  // Fetch time slots for the selected professional and date
-  const { 
-    data: timeSlots = [], 
-    isLoading: isLoadingTimeSlots,
-    refetch: refetchTimeSlots
-  } = useQuery({
-    queryKey: ['professionalTimeSlots', selectedProfessionalId, selectedDate],
-    queryFn: () => selectedProfessionalId && selectedDate 
-      ? fetchAllSlotsForProfessional(selectedProfessionalId)
-      : Promise.resolve([]),
-    enabled: !!selectedProfessionalId && !!selectedDate
+  // Fetch appointments
+  const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
+    queryKey: ['appointments'],
+    queryFn: fetchAppointments
   });
   
-  // Create time slot mutation
-  const createSlotMutation = useMutation({
-    mutationFn: ({ professionalId, startTime, endTime }: { 
-      professionalId: string, 
-      startTime: Date, 
-      endTime: Date 
-    }) => createAvailableSlot(professionalId, startTime, endTime),
+  // Update appointment status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' | 'completed' }) => 
+      updateAppointmentStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['professionalTimeSlots'] });
-      toast.success('Horário adicionado com sucesso');
-      setIsAddDialogOpen(false);
-      refetchTimeSlots();
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      toast.success('Status atualizado com sucesso');
+      setIsStatusDialogOpen(false);
     },
-    onError: (error: any) => {
-      toast.error(`Erro ao adicionar horário: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Erro ao atualizar status: ${error.message}`);
     }
   });
   
-  // Create bulk time slots mutation
-  const createBulkSlotsMutation = useMutation({
-    mutationFn: ({ 
-      professionalId, 
-      startDate, 
-      endDate, 
-      selectedDays, 
-      timeRanges 
-    }: { 
-      professionalId: string, 
-      startDate: Date, 
-      endDate: Date, 
-      selectedDays: number[],
-      timeRanges: Array<{startHour: string, startMinute: string, endHour: string, endMinute: string}>
-    }) => createAvailableSlotsBulk(professionalId, startDate, endDate, selectedDays, timeRanges),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['professionalTimeSlots'] });
-      toast.success(`${data.count} horários adicionados com sucesso`);
-      setIsAddBulkDialogOpen(false);
-      refetchTimeSlots();
+  const handleUpdateStatus = () => {
+    if (!selectedAppointment) return;
+    
+    updateStatusMutation.mutate({
+      id: selectedAppointment.id,
+      status: selectedStatus
+    });
+  };
+  
+  const openStatusDialog = (appointment: any, initialStatus: 'confirmed' | 'cancelled' | 'completed') => {
+    setSelectedAppointment(appointment);
+    setSelectedStatus(initialStatus);
+    setIsStatusDialogOpen(true);
+  };
+  
+  // Filter appointments based on selected date and status
+  const filteredAppointments = appointments.filter(appointment => {
+    if (!appointment.slots?.start_time) return false;
+    
+    const appointmentDate = new Date(appointment.slots.start_time);
+    
+    // Apply date filter
+    const dateMatch = selectedDate 
+      ? appointmentDate.toDateString() === selectedDate.toDateString() 
+      : true;
+    
+    // Apply status filter
+    const statusMatch = filterStatus === 'all' || appointment.status === filterStatus;
+    
+    return dateMatch && statusMatch;
+  });
+  
+  // Group appointments by date
+  const appointmentsByDate = filteredAppointments.reduce((acc, appointment) => {
+    if (!appointment.slots?.start_time) return acc;
+    
+    const dateStr = new Date(appointment.slots.start_time).toDateString();
+    
+    if (!acc[dateStr]) {
+      acc[dateStr] = [];
+    }
+    
+    acc[dateStr].push(appointment);
+    return acc;
+  }, {} as Record<string, any[]>);
+  
+  const sortedDates = Object.keys(appointmentsByDate).sort((a, b) => {
+    return new Date(a).getTime() - new Date(b).getTime();
+  });
+  
+  // Get counts of appointments by status
+  const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
+  const completedCount = appointments.filter(a => a.status === 'completed').length;
+  const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
+  
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'bg-blue-50 text-blue-700';
+      case 'completed':
+        return 'bg-green-50 text-green-700';
+      case 'cancelled':
+        return 'bg-red-50 text-red-700';
+      default:
+        return 'bg-gray-50 text-gray-700';
+    }
+  };
+  
+  // Get status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return <Clock className="h-4 w-4" />;
+      case 'completed':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return null;
+    }
+  };
+  
+  // Format appointment time
+  const formatAppointmentTime = (startTime: string, endTime?: string) => {
+    if (!startTime) return '-';
+    
+    if (endTime) {
+      return `${format(new Date(startTime), 'HH:mm')} - ${format(new Date(endTime), 'HH:mm')}`;
+    }
+    
+    return format(new Date(startTime), 'HH:mm');
+  };
+
+  const form = useForm<BulkScheduleFormValues>({
+    resolver: zodResolver(BulkScheduleFormSchema),
+    defaultValues: {
+      professionalId: '',
+      startDate: new Date(),
+      endDate: new Date(),
+      days: [],
+      timeRanges: [{ startHour: '09', startMinute: '00', endHour: '10', endMinute: '00' }],
     },
-    onError: (error: any) => {
-      toast.error(`Erro ao adicionar horários em massa: ${error.message}`);
-    }
   });
-  
-  // Delete time slot mutation
-  const deleteSlotMutation = useMutation({
-    mutationFn: (id: string) => deleteAvailableSlot(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['professionalTimeSlots'] });
-      toast.success('Horário removido com sucesso');
-      setIsDeleteDialogOpen(false);
-      refetchTimeSlots();
-    },
-    onError: (error: any) => {
-      toast.error(`Erro ao remover horário: ${error.message}`);
-    }
-  });
-  
-  const handleCreateTimeSlot = () => {
-    if (!selectedProfessionalId || !selectedDate) {
-      toast.error('Selecione um profissional e uma data');
-      return;
-    }
-    
-    const startTimeDate = set(selectedDate, {
-      hours: parseInt(startHour),
-      minutes: parseInt(startMinute),
-      seconds: 0,
-      milliseconds: 0
-    });
-    
-    const endTimeDate = set(selectedDate, {
-      hours: parseInt(endHour),
-      minutes: parseInt(endMinute),
-      seconds: 0,
-      milliseconds: 0
-    });
-    
-    if (endTimeDate <= startTimeDate) {
-      toast.error('O horário de término deve ser posterior ao horário de início');
-      return;
-    }
-    
-    createSlotMutation.mutate({
-      professionalId: selectedProfessionalId,
-      startTime: startTimeDate,
-      endTime: endTimeDate
-    });
-  };
-  
-  const handleCreateBulkTimeSlots = () => {
-    if (!selectedProfessionalId || !bulkStartDate || !bulkEndDate) {
-      toast.error('Selecione um profissional, data inicial e data final');
-      return;
-    }
-    
-    if (selectedDays.length === 0) {
-      toast.error('Selecione pelo menos um dia da semana');
-      return;
-    }
-    
-    if (timeRanges.length === 0) {
-      toast.error('Adicione pelo menos um intervalo de horário');
-      return;
-    }
-    
-    if (bulkEndDate < bulkStartDate) {
-      toast.error('A data final deve ser posterior à data inicial');
-      return;
-    }
-    
-    // Validate all time ranges
-    for (const range of timeRanges) {
-      const start = new Date();
-      start.setHours(parseInt(range.startHour), parseInt(range.startMinute), 0, 0);
-      
-      const end = new Date();
-      end.setHours(parseInt(range.endHour), parseInt(range.endMinute), 0, 0);
-      
-      if (end <= start) {
-        toast.error('O horário de término deve ser posterior ao horário de início em todos os intervalos');
-        return;
-      }
-    }
-    
-    createBulkSlotsMutation.mutate({
-      professionalId: selectedProfessionalId,
-      startDate: bulkStartDate,
-      endDate: bulkEndDate,
-      selectedDays,
-      timeRanges
-    });
-  };
-  
-  const handleDeleteTimeSlot = () => {
-    if (!selectedTimeSlot) return;
-    
-    deleteSlotMutation.mutate(selectedTimeSlot.id);
-  };
-  
-  const openDeleteDialog = (timeSlot: TimeSlot) => {
-    setSelectedTimeSlot(timeSlot);
-    setIsDeleteDialogOpen(true);
-  };
-  
-  const toggleDaySelection = (day: number) => {
-    if (selectedDays.includes(day)) {
-      setSelectedDays(selectedDays.filter(d => d !== day));
-    } else {
-      setSelectedDays([...selectedDays, day]);
+
+  const handleBulkCreate = async (form: BulkScheduleFormValues) => {
+    try {
+      setSubmitting(true);
+
+      const response = await createAvailableSlotsBulk(
+        form.professionalId,
+        new Date(form.startDate),
+        new Date(form.endDate),
+        form.days,
+        form.timeRanges
+      );
+
+      toast.success(`${response.count} horários criados com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      setBulkModalOpen(false);
+    } catch (error: any) {
+      toast.error(`Erro ao criar horários: ${error.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
-  
-  const addTimeRange = () => {
-    setTimeRanges([...timeRanges, { startHour: '09', startMinute: '00', endHour: '10', endMinute: '00' }]);
+
+  const refetchSlots = () => {
+    queryClient.invalidateQueries({ queryKey: ['appointments'] });
   };
-  
-  const removeTimeRange = (index: number) => {
-    if (timeRanges.length > 1) {
-      setTimeRanges(timeRanges.filter((_, i) => i !== index));
-    }
-  };
-  
-  const updateTimeRange = (index: number, field: string, value: string) => {
-    const updatedRanges = [...timeRanges];
-    updatedRanges[index] = { ...updatedRanges[index], [field]: value };
-    setTimeRanges(updatedRanges);
-  };
-  
-  // Filter slots for the selected date
-  const filteredTimeSlots = timeSlots.filter(slot => {
-    if (!slot.start_time || !selectedDate) return false;
-    
-    const slotDate = new Date(slot.start_time);
-    return slotDate.toDateString() === selectedDate.toDateString();
-  });
-  
-  // Generate hour options
-  const hourOptions = Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, '0');
-    return { value: hour, label: hour };
-  });
-  
-  // Generate minute options (0, 15, 30, 45)
-  const minuteOptions = [
-    { value: '00', label: '00' },
-    { value: '15', label: '15' },
-    { value: '30', label: '30' },
-    { value: '45', label: '45' }
-  ];
-  
-  const dayNames = [
-    { value: 0, label: 'Domingo' },
-    { value: 1, label: 'Segunda' },
-    { value: 2, label: 'Terça' },
-    { value: 3, label: 'Quarta' },
-    { value: 4, label: 'Quinta' },
-    { value: 5, label: 'Sexta' },
-    { value: 6, label: 'Sábado' }
-  ];
   
   return (
     <AdminLayout>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Gerenciar Horários</h1>
+        <h1 className="text-2xl font-bold mb-6">Agendamentos</h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Confirmados</p>
+                <p className="text-2xl font-bold">{confirmedCount}</p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-blue-700" />
+              </div>
+            </CardContent>
+          </Card>
           
-          <div className="flex gap-2">
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center gap-2" variant="outline">
-                  <Clock className="h-4 w-4" />
-                  Adicionar Horário
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Horário Disponível</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="professional">Profissional*</Label>
-                    <Select 
-                      value={selectedProfessionalId} 
-                      onValueChange={setSelectedProfessionalId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um profissional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {professionals.map((professional) => (
-                          <SelectItem key={professional.id} value={professional.id}>
-                            {professional.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Data*</Label>
-                    <div className="border rounded-md p-2">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        className="mx-auto pointer-events-auto"
-                        locale={ptBR}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Horário de Início*</Label>
-                      <div className="flex space-x-2">
-                        <Select value={startHour} onValueChange={setStartHour}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Hora" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {hourOptions.map(option => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        
-                        <Select value={startMinute} onValueChange={setStartMinute}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Minuto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {minuteOptions.map(option => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Horário de Término*</Label>
-                      <div className="flex space-x-2">
-                        <Select value={endHour} onValueChange={setEndHour}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Hora" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {hourOptions.map(option => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        
-                        <Select value={endMinute} onValueChange={setEndMinute}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Minuto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {minuteOptions.map(option => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancelar</Button>
-                  </DialogClose>
-                  <Button 
-                    onClick={handleCreateTimeSlot}
-                    disabled={createSlotMutation.isPending}
-                  >
-                    {createSlotMutation.isPending ? 'Adicionando...' : 'Adicionar'}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-            
-            <Dialog open={isAddBulkDialogOpen} onOpenChange={setIsAddBulkDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4" />
-                  Adicionar em Massa
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Horários em Massa</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                  <div className="space-y-2">
-                    <Label htmlFor="bulk-professional">Profissional*</Label>
-                    <Select 
-                      value={selectedProfessionalId} 
-                      onValueChange={setSelectedProfessionalId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um profissional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {professionals.map((professional) => (
-                          <SelectItem key={professional.id} value={professional.id}>
-                            {professional.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Data Inicial*</Label>
-                      <div className="border rounded-md p-2">
-                        <Calendar
-                          mode="single"
-                          selected={bulkStartDate}
-                          onSelect={(date) => date && setBulkStartDate(date)}
-                          className="mx-auto pointer-events-auto"
-                          locale={ptBR}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Data Final*</Label>
-                      <div className="border rounded-md p-2">
-                        <Calendar
-                          mode="single"
-                          selected={bulkEndDate}
-                          onSelect={(date) => date && setBulkEndDate(date)}
-                          className="mx-auto pointer-events-auto"
-                          locale={ptBR}
-                          disabled={(date) => date < bulkStartDate}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Dias da Semana*</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {dayNames.map(day => (
-                        <div key={day.value} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`day-${day.value}`} 
-                            checked={selectedDays.includes(day.value)}
-                            onCheckedChange={() => toggleDaySelection(day.value)}
-                          />
-                          <Label htmlFor={`day-${day.value}`} className="cursor-pointer">
-                            {day.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label>Intervalos de Horário*</Label>
-                      <Button 
-                        type="button" 
-                        size="sm" 
-                        onClick={addTimeRange}
-                        variant="outline"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Adicionar Intervalo
-                      </Button>
-                    </div>
-                    
-                    {timeRanges.map((range, index) => (
-                      <div key={index} className="border p-3 rounded-md">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium">Intervalo {index + 1}</span>
-                          {timeRanges.length > 1 && (
-                            <Button 
-                              type="button" 
-                              size="icon" 
-                              variant="ghost" 
-                              onClick={() => removeTimeRange(index)}
-                              className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Horário de Início</Label>
-                            <div className="flex space-x-2">
-                              <Select 
-                                value={range.startHour} 
-                                onValueChange={(value) => updateTimeRange(index, 'startHour', value)}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Hora" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {hourOptions.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              
-                              <Select 
-                                value={range.startMinute} 
-                                onValueChange={(value) => updateTimeRange(index, 'startMinute', value)}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Minuto" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {minuteOptions.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label>Horário de Término</Label>
-                            <div className="flex space-x-2">
-                              <Select 
-                                value={range.endHour} 
-                                onValueChange={(value) => updateTimeRange(index, 'endHour', value)}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Hora" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {hourOptions.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              
-                              <Select 
-                                value={range.endMinute} 
-                                onValueChange={(value) => updateTimeRange(index, 'endMinute', value)}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Minuto" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {minuteOptions.map(option => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancelar</Button>
-                  </DialogClose>
-                  <Button 
-                    onClick={handleCreateBulkTimeSlots}
-                    disabled={createBulkSlotsMutation.isPending}
-                  >
-                    {createBulkSlotsMutation.isPending ? 'Adicionando...' : 'Adicionar Horários'}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+          <Card>
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Concluídos</p>
+                <p className="text-2xl font-bold">{completedCount}</p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle className="h-4 w-4 text-green-700" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Cancelados</p>
+                <p className="text-2xl font-bold">{cancelledCount}</p>
+              </div>
+              <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <XCircle className="h-4 w-4 text-red-700" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
         
         <div className="grid md:grid-cols-[300px_1fr] gap-6">
@@ -609,128 +289,196 @@ const Schedule = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="filter-professional">Profissional</Label>
-                  <Select 
-                    value={selectedProfessionalId} 
-                    onValueChange={setSelectedProfessionalId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um profissional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {professionals.map((professional) => (
-                        <SelectItem key={professional.id} value={professional.id}>
-                          {professional.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
                   <Label>Data</Label>
                   <div className="border rounded-md p-2">
                     <Calendar
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      className="mx-auto pointer-events-auto"
+                      className="mx-auto"
                       locale={ptBR}
                     />
                   </div>
                 </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="filter-status">Status</Label>
+                  <Select 
+                    value={filterStatus} 
+                    onValueChange={setFilterStatus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="confirmed">Confirmados</SelectItem>
+                      <SelectItem value="completed">Concluídos</SelectItem>
+                      <SelectItem value="cancelled">Cancelados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setSelectedDate(undefined);
+                    setFilterStatus('all');
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
               </div>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader>
-              <CardTitle>Horários Disponíveis</CardTitle>
+              <CardTitle>Lista de Agendamentos</CardTitle>
               <CardDescription>
                 {selectedDate ? (
                   <span>
                     {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </span>
-                ) : 'Selecione uma data'}
-                {selectedProfessionalId && (
-                  <span> - {professionals.find(p => p.id === selectedProfessionalId)?.name}</span>
+                ) : 'Todos os agendamentos'}
+                {filterStatus !== 'all' && (
+                  <span> - {
+                    filterStatus === 'confirmed' ? 'Confirmados' : 
+                    filterStatus === 'completed' ? 'Concluídos' : 'Cancelados'
+                  }</span>
                 )}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!selectedProfessionalId || !selectedDate ? (
+              {isLoadingAppointments ? (
+                <div className="text-center py-8">Carregando agendamentos...</div>
+              ) : filteredAppointments.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  Selecione um profissional e uma data para visualizar os horários.
-                </div>
-              ) : isLoadingTimeSlots ? (
-                <div className="text-center py-8">Carregando horários...</div>
-              ) : filteredTimeSlots.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Nenhum horário disponível para a data selecionada.
+                  Nenhum agendamento encontrado com os filtros selecionados.
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Início</TableHead>
-                      <TableHead>Término</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-[100px]">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTimeSlots.map((slot) => (
-                      <TableRow key={slot.id}>
-                        <TableCell>
-                          {slot.start_time && format(new Date(slot.start_time), 'HH:mm')}
-                        </TableCell>
-                        <TableCell>
-                          {slot.end_time && format(new Date(slot.end_time), 'HH:mm')}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            slot.is_available 
-                              ? 'bg-green-50 text-green-700' 
-                              : 'bg-red-50 text-red-700'
-                          }`}>
-                            {slot.is_available ? 'Disponível' : 'Ocupado'}
+                <div className="space-y-6">
+                  {sortedDates.map(dateStr => (
+                    <div key={dateStr}>
+                      <h3 className="font-medium mb-2 text-muted-foreground">
+                        {format(new Date(dateStr), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        {isToday(new Date(dateStr)) && (
+                          <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary">
+                            Hoje
                           </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            onClick={() => openDeleteDialog(slot)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        )}
+                      </h3>
+                      
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Horário</TableHead>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Telefone</TableHead>
+                            <TableHead>Profissional</TableHead>
+                            <TableHead>Serviço</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-[100px]">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {appointmentsByDate[dateStr].map((appointment) => (
+                            <TableRow key={appointment.id}>
+                              <TableCell>
+                                {appointment.slots && formatAppointmentTime(appointment.slots.start_time, appointment.slots.end_time)}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {appointment.client_name}
+                              </TableCell>
+                              <TableCell>{appointment.client_phone}</TableCell>
+                              <TableCell>{appointment.professionals?.name || '-'}</TableCell>
+                              <TableCell>{appointment.services?.name || '-'}</TableCell>
+                              <TableCell>
+                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                                  {getStatusIcon(appointment.status)}
+                                  <span className="ml-1">
+                                    {appointment.status === 'confirmed' ? 'Confirmado' : 
+                                     appointment.status === 'completed' ? 'Concluído' : 'Cancelado'}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => openStatusDialog(appointment, 
+                                    appointment.status as 'confirmed' | 'cancelled' | 'completed'
+                                  )}
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
         </div>
+        <Button onClick={() => setBulkModalOpen(true)}>Criar Horários em Massa</Button>
       </div>
       
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {/* Update Status Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogTitle>Atualizar Status do Agendamento</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p>
-              Tem certeza que deseja remover este horário?
-            </p>
-            {selectedTimeSlot && selectedTimeSlot.start_time && selectedTimeSlot.end_time && (
-              <p className="font-medium mt-2">
-                {format(new Date(selectedTimeSlot.start_time), 'dd/MM/yyyy HH:mm')} - 
-                {format(new Date(selectedTimeSlot.end_time), ' HH:mm')}
-              </p>
+            {selectedAppointment && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Cliente</p>
+                  <p className="font-medium">{selectedAppointment.client_name}</p>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Serviço</p>
+                  <p className="font-medium">{selectedAppointment.services?.name || '-'}</p>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Horário</p>
+                  <p className="font-medium">
+                    {selectedAppointment.slots && (
+                      <>
+                        {format(new Date(selectedAppointment.slots.start_time), "dd/MM/yyyy HH:mm")}
+                        {selectedAppointment.slots.end_time && (
+                          <> - {format(new Date(selectedAppointment.slots.end_time), "HH:mm")}</>
+                        )}
+                      </>
+                    )}
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select 
+                    value={selectedStatus} 
+                    onValueChange={(value) => setSelectedStatus(value as 'confirmed' | 'cancelled' | 'completed')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="confirmed">Confirmado</SelectItem>
+                      <SelectItem value="completed">Concluído</SelectItem>
+                      <SelectItem value="cancelled">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             )}
           </div>
           <div className="flex justify-end gap-2">
@@ -738,13 +486,227 @@ const Schedule = () => {
               <Button variant="outline">Cancelar</Button>
             </DialogClose>
             <Button 
-              variant="destructive" 
-              onClick={handleDeleteTimeSlot}
-              disabled={deleteSlotMutation.isPending}
+              onClick={handleUpdateStatus}
+              disabled={updateStatusMutation.isPending}
             >
-              {deleteSlotMutation.isPending ? 'Removendo...' : 'Remover'}
+              {updateStatusMutation.isPending ? 'Atualizando...' : 'Atualizar'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Create Modal */}
+      <Dialog open={isBulkModalOpen} onOpenChange={setBulkModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Criar Horários em Massa</DialogTitle>
+            <DialogClose className="absolute top-2 right-2 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleBulkCreate)} className="space-y-8">
+              <FormField
+                control={form.control}
+                name="professionalId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Profissional</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um profissional" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {professionals.map((professional) => (
+                          <SelectItem key={professional.id} value={professional.id}>
+                            {professional.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex flex-col md:flex-row gap-4">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Data de Início</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={format(field.value, "dd/MM/yyyy") ? "w-full justify-start text-left font-normal" : "w-full justify-start text-left font-normal text-muted-foreground"}
+                            >
+                              {format(field.value, "dd/MM/yyyy") ? (
+                                format(field.value, "dd/MM/yyyy")
+                              ) : (
+                                <span>Selecione a data de início</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            locale={ptBR}
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              isBefore(date, new Date())
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Data de Término</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={format(field.value, "dd/MM/yyyy") ? "w-full justify-start text-left font-normal" : "w-full justify-start text-left font-normal text-muted-foreground"}
+                            >
+                              {format(field.value, "dd/MM/yyyy") ? (
+                                format(field.value, "dd/MM/yyyy")
+                              ) : (
+                                <span>Selecione a data de término</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            locale={ptBR}
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              isBefore(date, new Date()) || isBefore(date, form.getValues("startDate"))
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dias da Semana</FormLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {daysOfWeek.map((day) => (
+                        <div key={day.value} className="flex items-center space-x-2">
+                          <Input
+                            type="checkbox"
+                            id={`day-${day.value}`}
+                            checked={field.value.includes(day.value)}
+                            onChange={() => {
+                              if (field.value.includes(day.value)) {
+                                field.onChange(field.value.filter((v) => v !== day.value));
+                              } else {
+                                field.onChange([...field.value, day.value]);
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`day-${day.value}`}>{day.label}</Label>
+                        </div>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div>
+                <FormLabel>Horários</FormLabel>
+                {form.watch("timeRanges").map((_, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <FormField
+                      control={form.control}
+                      name={`timeRanges.${index}.startHour`}
+                      render={({ field }) => (
+                        <FormItem className="w-1/4">
+                          <FormLabel>Hora Início</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`timeRanges.${index}.startMinute`}
+                      render={({ field }) => (
+                        <FormItem className="w-1/4">
+                          <FormLabel>Minuto Início</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`timeRanges.${index}.endHour`}
+                      render={({ field }) => (
+                        <FormItem className="w-1/4">
+                          <FormLabel>Hora Fim</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`timeRanges.${index}.endMinute`}
+                      render={({ field }) => (
+                        <FormItem className="w-1/4">
+                          <FormLabel>Minuto Fim</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Criando..." : "Criar Horários"}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </AdminLayout>

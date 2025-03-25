@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { CheckCircle, ArrowLeft, Calendar, Clock, User, Clipboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -8,14 +7,26 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchAppointmentById } from '@/services/api';
 import { Appointment } from '@/types/types';
 import NavBar from '@/components/NavBar';
+import { useToast } from '@/hooks/use-toast';
 
 const AppointmentSuccess = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  
+  const appointmentFromState = location.state?.appointment as Appointment | undefined;
   
   useEffect(() => {
+    if (appointmentFromState) {
+      console.log('Using appointment from state:', appointmentFromState);
+      setAppointment(appointmentFromState);
+      setLoading(false);
+      return;
+    }
+    
     const loadAppointment = async () => {
       try {
         if (!id) {
@@ -24,13 +35,18 @@ const AppointmentSuccess = () => {
           return;
         }
         
+        console.log('Fetching appointment with ID:', id);
         const data = await fetchAppointmentById(id);
+        
         if (!data) {
+          console.error('No appointment found with ID:', id);
           setError('Agendamento não encontrado.');
         } else {
+          console.log('Appointment loaded successfully:', data);
           setAppointment(data);
         }
       } catch (err: any) {
+        console.error('Error loading appointment:', err);
         setError(err.message || 'Erro ao carregar detalhes do agendamento.');
       } finally {
         setLoading(false);
@@ -38,7 +54,7 @@ const AppointmentSuccess = () => {
     };
     
     loadAppointment();
-  }, [id]);
+  }, [id, appointmentFromState]);
   
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Data não disponível';
@@ -210,3 +226,4 @@ const AppointmentSuccess = () => {
 };
 
 export default AppointmentSuccess;
+

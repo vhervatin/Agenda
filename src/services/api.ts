@@ -130,6 +130,8 @@ export const createAppointment = async (
     
     if (slotError) throw slotError;
     
+    console.log('Creating appointment with slot data:', slotData);
+    
     // Create the appointment
     const { data, error } = await supabase
       .from('appointments')
@@ -147,6 +149,8 @@ export const createAppointment = async (
       .single();
     
     if (error) throw error;
+    
+    console.log('Appointment created:', data);
     
     // Update the slot to no longer be available
     const { error: updateError } = await supabase
@@ -348,14 +352,7 @@ export const fetchCompanySettings = async () => {
   }
 };
 
-export const updateCompanySettings = async (settings: {
-  id: string;
-  name: string;
-  logo_url?: string;
-  primary_color: string;
-  secondary_color: string;
-  slug: string;
-}) => {
+export const updateCompanySettings = async (settings: Partial<Company> & { id: string }) => {
   try {
     const { data, error } = await supabase
       .from('companies')
@@ -689,12 +686,14 @@ export const createUserForCompany = async (user: Omit<User, 'id' | 'created_at' 
     if (userError) throw userError;
     
     // Then create the company-user association
-    const { error: associationError } = await supabase
+    const { data: companyUserData, error: associationError } = await supabase
       .from('company_users')
       .insert({
         company_id: companyId,
         user_id: userData.id
-      });
+      })
+      .select()
+      .single();
     
     if (associationError) throw associationError;
     
@@ -802,6 +801,8 @@ export const createAvailableSlot = async (
 
 export const fetchAppointmentById = async (id: string): Promise<Appointment | null> => {
   try {
+    console.log('Fetching appointment with ID:', id);
+    
     const { data, error } = await supabase
       .from('appointments')
       .select(`
@@ -814,12 +815,15 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       .single();
     
     if (error) {
+      console.error('Error fetching appointment by ID:', error);
       if (error.code === 'PGRST116') {
         // No appointment found with this id
         return null;
       }
       throw error;
     }
+    
+    console.log('Appointment data retrieved:', data);
     
     // Ensure the returned data matches the Appointment type
     return {
