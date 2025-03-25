@@ -110,3 +110,14 @@ export interface TimeRange {
   endHour: string;
   endMinute: string;
 }
+
+export interface WebhookLog {
+  id: string;
+  webhook_id: string;
+  event_type: string;
+  payload: any;
+  status: string;
+  attempts: number;
+  created_at: string;
+  updated_at: string;
+}
