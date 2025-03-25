@@ -216,12 +216,20 @@ const Schedule = () => {
     try {
       setSubmitting(true);
 
+      // Ensure all timeRanges have required fields
+      const formattedTimeRanges: TimeRange[] = form.timeRanges.map(range => ({
+        startHour: range.startHour,
+        startMinute: range.startMinute,
+        endHour: range.endHour,
+        endMinute: range.endMinute
+      }));
+
       const response = await createAvailableSlotsBulk(
         form.professionalId,
         new Date(form.startDate),
         new Date(form.endDate),
         form.days,
-        form.timeRanges
+        formattedTimeRanges
       );
 
       toast.success(`${response.count} horários criados com sucesso!`);

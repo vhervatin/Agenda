@@ -43,6 +43,8 @@ const Settings = () => {
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [companySettings, setCompanySettings] = useState(null);
 
   const { data: companyData, isLoading } = useQuery({
     queryKey: ['companySettings'],
@@ -113,6 +115,62 @@ const Settings = () => {
       toast.error(`Erro ao criar configurações: ${error.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    setLoading(true);
+    
+    try {
+      // Ensure all required fields are present
+      const companyData = {
+        name: formData.name || 'My Company', // Provide default values for required fields
+        slug: formData.slug,
+        logo_url: formData.logo_url,
+        primary_color: formData.primary_color || '#663399',
+        secondary_color: formData.secondary_color || '#FFA500'
+      };
+      
+      const result = await createCompanySettings(companyData);
+      
+      if (result) {
+        toast.success("Configurações criadas com sucesso!");
+        setCompanySettings(result);
+      }
+    } catch (error: any) {
+      console.error("Error creating settings:", error);
+      toast.error(`Erro ao criar configurações: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!companySettings?.id) return;
+    
+    setLoading(true);
+    
+    try {
+      // Ensure name is always provided
+      const updatedData = {
+        ...formData,
+        name: formData.name || companySettings.name || 'My Company'
+      };
+      
+      const result = await updateCompanySettings({
+        ...updatedData,
+        id: companySettings.id
+      });
+      
+      if (result) {
+        toast.success("Configurações atualizadas com sucesso!");
+        setCompanySettings(result);
+      }
+    } catch (error: any) {
+      console.error("Error updating settings:", error);
+      toast.error(`Erro ao atualizar configurações: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 

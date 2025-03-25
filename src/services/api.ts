@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Service, Professional, TimeSlot, Appointment, TimeRange, WebhookConfiguration, WebhookLog, Company, User } from '@/types/types';
 
@@ -132,7 +131,7 @@ export const createAppointment = async (
     
     console.log('Creating appointment with slot data:', slotData);
     
-    // Create the appointment
+    // Create the appointment - use the actual start_time from the slot
     const { data, error } = await supabase
       .from('appointments')
       .insert({
@@ -143,7 +142,7 @@ export const createAppointment = async (
         client_phone: clientPhone,
         client_cpf: clientCpf,
         status: 'confirmed',
-        appointment_date: slotData.start_time, // Save appointment date/time
+        appointment_date: slotData.start_time, // Use the exact start time from the slot
       })
       .select()
       .single();
@@ -685,15 +684,11 @@ export const createUserForCompany = async (user: Omit<User, 'id' | 'created_at' 
     
     if (userError) throw userError;
     
-    // Then create the company-user association
-    const { data: companyUserData, error: associationError } = await supabase
-      .from('company_users')
-      .insert({
-        company_id: companyId,
-        user_id: userData.id
-      })
-      .select()
-      .single();
+    // Then create the company-user association - Using separate SQL as company_users table isn't in types
+    const { data: companyUserData, error: associationError } = await supabase.rpc('associate_user_with_company', {
+      p_company_id: companyId,
+      p_user_id: userData.id
+    });
     
     if (associationError) throw associationError;
     
@@ -720,7 +715,16 @@ export const fetchUserByAuthId = async (authId: string): Promise<User | null> =>
       throw error;
     }
     
-    return data;
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      role: data.role as 'admin' | 'professional',
+      tipo_usuario: data.tipo_usuario as 'admin' | 'superadmin',
+      auth_id: data.auth_id,
+      created_at: data.created_at,
+      updated_at: data.updated_at
+    };
   } catch (error) {
     console.error('Error fetching user by auth ID:', error);
     return null;
@@ -835,3 +839,4 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
     return null;
   }
 };
+

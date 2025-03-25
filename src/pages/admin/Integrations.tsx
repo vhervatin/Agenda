@@ -41,7 +41,7 @@ const Integrations = () => {
     queryFn: fetchWebhookConfigurations
   });
   
-  // Fetch webhook logs
+  // Fix the 2 arguments call to fetchWebhookLogs
   const { data: webhookLogs = [], isLoading: isLoadingLogs } = useQuery({
     queryKey: ['webhook-logs'],
     queryFn: fetchWebhookLogs

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -53,7 +54,14 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ professionals, onAddSlots }
   })
 
   const addTimeRange = (values: z.infer<typeof timeRangeSchema>) => {
-    setTimeRanges([...timeRanges, values]);
+    // Make sure we have all required fields for TimeRange
+    const newTimeRange: TimeRange = {
+      startHour: values.startHour,
+      startMinute: values.startMinute,
+      endHour: values.endHour,
+      endMinute: values.endMinute
+    };
+    setTimeRanges([...timeRanges, newTimeRange]);
     form.reset();
   };
 
@@ -67,29 +75,21 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ professionals, onAddSlots }
     e.preventDefault();
     
     if (!selectedProfessional) {
-      toast({
-        title: "Erro",
-        description: "Selecione um profissional para continuar.",
-        variant: "destructive",
-      });
+      toast.error("Selecione um profissional para continuar.");
       return;
     }
     
     if (timeRanges.length === 0) {
-      toast({
-        title: "Erro",
-        description: "Adicione pelo menos um horário.",
-        variant: "destructive",
-      });
+      toast.error("Adicione pelo menos um horário.");
       return;
     }
     
     // Make sure all TimeRange properties are strings to match the required type
     const formattedTimeRanges = timeRanges.map(range => ({
-      startHour: range.startHour || '09',
-      startMinute: range.startMinute || '00',
-      endHour: range.endHour || '10',
-      endMinute: range.endMinute || '00'
+      startHour: range.startHour,
+      startMinute: range.startMinute,
+      endHour: range.endHour,
+      endMinute: range.endMinute
     }));
     
     onAddSlots(selectedProfessional, formattedTimeRanges);
