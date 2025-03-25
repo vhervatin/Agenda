@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   CalendarDays,
   Users,
-  Scissors,
+  ClipboardList,
   CheckCircle,
   XCircle,
   Clock
@@ -127,7 +127,7 @@ const Dashboard = () => {
                   <p className="text-3xl font-semibold">{services.length}</p>
                 </div>
                 <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Scissors className="h-6 w-6 text-primary" />
+                  <ClipboardList className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </CardContent>

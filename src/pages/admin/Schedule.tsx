@@ -80,7 +80,7 @@ const Schedule = () => {
       setIsAddDialogOpen(false);
       refetchTimeSlots();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao adicionar horário: ${error.message}`);
     }
   });
@@ -106,7 +106,7 @@ const Schedule = () => {
       setIsAddBulkDialogOpen(false);
       refetchTimeSlots();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao adicionar horários em massa: ${error.message}`);
     }
   });
@@ -120,7 +120,7 @@ const Schedule = () => {
       setIsDeleteDialogOpen(false);
       refetchTimeSlots();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao remover horário: ${error.message}`);
     }
   });
@@ -313,7 +313,7 @@ const Schedule = () => {
                         mode="single"
                         selected={selectedDate}
                         onSelect={setSelectedDate}
-                        className="mx-auto"
+                        className="mx-auto pointer-events-auto"
                         locale={ptBR}
                       />
                     </div>
@@ -436,7 +436,7 @@ const Schedule = () => {
                           mode="single"
                           selected={bulkStartDate}
                           onSelect={(date) => date && setBulkStartDate(date)}
-                          className="mx-auto"
+                          className="mx-auto pointer-events-auto"
                           locale={ptBR}
                         />
                       </div>
@@ -449,7 +449,7 @@ const Schedule = () => {
                           mode="single"
                           selected={bulkEndDate}
                           onSelect={(date) => date && setBulkEndDate(date)}
-                          className="mx-auto"
+                          className="mx-auto pointer-events-auto"
                           locale={ptBR}
                           disabled={(date) => date < bulkStartDate}
                         />
@@ -634,7 +634,7 @@ const Schedule = () => {
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      className="mx-auto"
+                      className="mx-auto pointer-events-auto"
                       locale={ptBR}
                     />
                   </div>
@@ -689,11 +689,11 @@ const Schedule = () => {
                         </TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            slot.available 
+                            slot.is_available 
                               ? 'bg-green-50 text-green-700' 
                               : 'bg-red-50 text-red-700'
                           }`}>
-                            {slot.available ? 'Disponível' : 'Ocupado'}
+                            {slot.is_available ? 'Disponível' : 'Ocupado'}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -702,7 +702,6 @@ const Schedule = () => {
                             size="icon"
                             className="text-destructive"
                             onClick={() => openDeleteDialog(slot)}
-                            disabled={!slot.available}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

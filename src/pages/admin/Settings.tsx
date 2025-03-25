@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,31 +10,121 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const Settings = () => {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [businessName, setBusinessName] = useState('Meu Salão');
-  const [businessEmail, setBusinessEmail] = useState('contato@meusalao.com');
+  
+  // Company settings
+  const [businessName, setBusinessName] = useState('Meu Negócio');
+  const [businessEmail, setBusinessEmail] = useState('contato@meunegocio.com');
   const [businessPhone, setBusinessPhone] = useState('(00) 00000-0000');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#663399');
+  const [secondaryColor, setSecondaryColor] = useState('#FFA500');
+  
+  // Appointment settings
   const [allowCancellations, setAllowCancellations] = useState(true);
   const [cancellationTimeLimit, setCancellationTimeLimit] = useState(24);
   const [allowRescheduling, setAllowRescheduling] = useState(true);
   const [defaultAppointmentDuration, setDefaultAppointmentDuration] = useState(60);
   
+  // Account settings
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Fetch company information
+  const { data: companyData, isLoading: isLoadingCompany } = useQuery({
+    queryKey: ['company'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data) {
+        setBusinessName(data.name || 'Meu Negócio');
+        setLogoUrl(data.logo_url || '');
+        setPrimaryColor(data.primary_color || '#663399');
+        setSecondaryColor(data.secondary_color || '#FFA500');
+      }
+    }
+  });
+  
+  // Update company information
+  const updateCompanyMutation = useMutation({
+    mutationFn: async (companyData: {
+      name: string;
+      logo_url?: string;
+      primary_color: string;
+      secondary_color: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('companies')
+        .update(companyData)
+        .eq('id', companyData.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['company'] });
+      toast.success('Informações da empresa atualizadas com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao atualizar informações: ${error.message}`);
+    }
+  });
 
   const handleSaveGeneralSettings = () => {
     setIsLoading(true);
     
-    // In a real application, you would save these to Supabase
-    // For now, we'll just simulate the API call
+    if (companyData) {
+      updateCompanyMutation.mutate({
+        id: companyData.id,
+        name: businessName,
+        logo_url: logoUrl,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor
+      });
+    } else {
+      // Create a new company record if none exists
+      const createNewCompany = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('companies')
+            .insert({
+              name: businessName,
+              logo_url: logoUrl,
+              primary_color: primaryColor,
+              secondary_color: secondaryColor
+            })
+            .select()
+            .single();
+          
+          if (error) throw error;
+          
+          queryClient.invalidateQueries({ queryKey: ['company'] });
+          toast.success('Informações da empresa criadas com sucesso!');
+        } catch (error: any) {
+          toast.error(`Erro ao criar informações: ${error.message}`);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      createNewCompany();
+    }
     
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success('Configurações gerais salvas com sucesso!');
-    }, 1000);
+    setIsLoading(false);
   };
 
   const handleChangePassword = async () => {
@@ -61,9 +151,51 @@ const Settings = () => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating password:', error);
       toast.error('Erro ao atualizar senha. Verifique a senha atual.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle logo upload
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    setIsLoading(true);
+    
+    try {
+      // Check if 'logos' storage bucket exists, if not create it
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.find(bucket => bucket.name === 'logos')) {
+        await supabase.storage.createBucket('logos', {
+          public: true
+        });
+      }
+      
+      // Upload the file
+      const fileName = `logo-${Date.now()}-${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('logos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+      
+      setLogoUrl(publicUrlData.publicUrl);
+      toast.success('Logo enviado com sucesso!');
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      toast.error(`Erro ao enviar logo: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -118,6 +250,64 @@ const Settings = () => {
                     value={businessPhone} 
                     onChange={(e) => setBusinessPhone(e.target.value)} 
                   />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="logo">Logo do Negócio</Label>
+                  {logoUrl && (
+                    <div className="mb-2">
+                      <img 
+                        src={logoUrl} 
+                        alt="Logo da empresa" 
+                        className="max-h-32 rounded-md"
+                      />
+                    </div>
+                  )}
+                  <Input 
+                    id="logo" 
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Recomendado: PNG ou JPG, tamanho máximo de 2MB
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="primary-color">Cor Primária</Label>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        id="primary-color" 
+                        type="color"
+                        value={primaryColor} 
+                        onChange={(e) => setPrimaryColor(e.target.value)} 
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input 
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="secondary-color">Cor Secundária</Label>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        id="secondary-color" 
+                        type="color"
+                        value={secondaryColor} 
+                        onChange={(e) => setSecondaryColor(e.target.value)} 
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input 
+                        value={secondaryColor}
+                        onChange={(e) => setSecondaryColor(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

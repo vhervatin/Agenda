@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { CalendarDays, Clock, ClipboardList, User, Phone, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
     }).format(date);
   };
 
-  const allDetailsProvided = service && date && time && professionalName;
+  const allDetailsProvided = service && date && time && professionalName && clientName && clientPhone;
 
   return (
     <Card className="w-full animate-scale-in">
