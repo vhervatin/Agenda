@@ -1,13 +1,30 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, Menu, X, LogIn } from 'lucide-react';
+import { CalendarDays, Menu, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Logo from '@/components/Logo';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { fetchCompanySettings } from '@/services/api';
 
 const NavBar = () => {
   const location = useLocation();
+  const [companyName, setCompanyName] = useState('Agenda');
+  
+  useEffect(() => {
+    const getCompanyName = async () => {
+      try {
+        const settings = await fetchCompanySettings();
+        if (settings && settings.name) {
+          setCompanyName(settings.name);
+        }
+      } catch (error) {
+        console.error('Error fetching company name:', error);
+      }
+    };
+    
+    getCompanyName();
+  }, []);
   
   const links = [
     { href: '/', label: 'Início' },
@@ -20,7 +37,7 @@ const NavBar = () => {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="text-xl font-bold">Agenda</span>
+          <span className="text-xl font-bold">{companyName}</span>
         </div>
         
         {/* Desktop Navigation */}
@@ -65,7 +82,7 @@ const NavBar = () => {
               <div className="px-7">
                 <Link to="/" className="flex items-center gap-2 mb-8">
                   <Logo />
-                  <span className="text-xl font-bold">Agenda</span>
+                  <span className="text-xl font-bold">{companyName}</span>
                 </Link>
                 
                 <nav className="flex flex-col gap-4">

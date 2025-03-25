@@ -40,6 +40,7 @@ export interface Appointment {
   client_cpf?: string;
   status: 'confirmed' | 'cancelled' | 'completed';
   created_at?: string;
+  appointment_date?: string; // The actual date/time of the appointment
   services?: Service;
   professionals?: Professional;
   slots?: {

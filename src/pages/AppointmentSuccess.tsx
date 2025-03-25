@@ -72,8 +72,10 @@ const AppointmentSuccess = () => {
           slot_id: data.slot_id,
           client_name: data.client_name,
           client_phone: data.client_phone,
+          client_cpf: data.client_cpf,
           status: data.status as 'confirmed' | 'cancelled' | 'completed',
           created_at: data.created_at,
+          appointment_date: data.appointment_date || data.slots.start_time, // Use appointment_date if available, otherwise fall back to slot time
           professionals: data.professionals as Professional,
           services: data.services as Service,
           slots: data.slots as TimeSlot
@@ -141,7 +143,13 @@ const AppointmentSuccess = () => {
     );
   }
   
-  const appointmentDate = appointment.slots.start_time ? parseISO(appointment.slots.start_time) : new Date();
+  // Use appointment_date if available, otherwise use the slot time
+  const appointmentDate = appointment.appointment_date 
+    ? parseISO(appointment.appointment_date) 
+    : appointment.slots.start_time 
+      ? parseISO(appointment.slots.start_time) 
+      : new Date();
+      
   const formattedDate = format(appointmentDate, "EEEE, d 'de' MMMM", { locale: ptBR });
   const formattedTime = format(appointmentDate, "HH:mm");
   
