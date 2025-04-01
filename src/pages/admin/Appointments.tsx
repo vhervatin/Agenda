@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -43,7 +44,7 @@ const AppointmentsAdmin = () => {
     refetch 
   } = useQuery({
     queryKey: ['appointments', filters],
-    queryFn: fetchAppointments
+    queryFn: () => fetchAppointments({ queryKey: ['appointments', filters] })
   });
   
   const updateStatusMutation = useMutation({

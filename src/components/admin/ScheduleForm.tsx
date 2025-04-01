@@ -123,8 +123,9 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
     }
     
     if (timeRanges.length === 0) {
-      toast.error("Adicione pelo menos um horário.");
-      return;
+      // Usar o valor atual do formulário diretamente
+      const currentValues = form.getValues();
+      addTimeRange(currentValues);
     }
     
     onSubmit();

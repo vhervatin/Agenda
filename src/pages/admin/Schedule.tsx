@@ -14,9 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ScheduleForm from '@/components/admin/ScheduleForm';
 import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments, fetchProfessionals } from '@/services/api';
-import { TimeRange } from '@/types/types';
+import { TimeRange, TimeSlot } from '@/types/types';
 import { ptBR } from 'date-fns/locale';
 
+// Interface para os slots locais
 interface Slot {
   id: string;
   start_time: string;
@@ -74,7 +75,14 @@ const Schedule = () => {
   
   useEffect(() => {
     if (availableSlotsData) {
-      setSlots(availableSlotsData);
+      // Converta TimeSlot[] para Slot[]
+      const convertedSlots: Slot[] = availableSlotsData.map(slot => ({
+        id: slot.id,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        is_available: slot.is_available || false
+      }));
+      setSlots(convertedSlots);
     }
   }, [availableSlotsData]);
   
@@ -147,7 +155,7 @@ const Schedule = () => {
   
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
     queryKey: ['appointments', { date: formattedDate }],
-    queryFn: fetchAppointments,
+    queryFn: () => fetchAppointments({ queryKey: ['appointments', { date: formattedDate }] }),
     enabled: !!formattedDate
   });
   

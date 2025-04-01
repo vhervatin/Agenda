@@ -23,8 +23,8 @@ export interface TimeSlot {
   id: string;
   time: string;
   available: boolean;
-  start_time?: string;
-  end_time?: string;
+  start_time: string;
+  end_time: string;
   professional_id?: string;
   is_available?: boolean;
 }
