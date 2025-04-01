@@ -35,19 +35,16 @@ const Integrations = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
   
-  // Fetch webhook configurations
   const { data: webhookConfigurations = [], isLoading: isLoadingConfigurations } = useQuery({
     queryKey: ['webhook-configurations'],
     queryFn: fetchWebhookConfigurations
   });
   
-  // Fix the 2 arguments call to fetchWebhookLogs
   const { data: webhookLogs = [], isLoading: isLoadingLogs } = useQuery({
     queryKey: ['webhook-logs'],
     queryFn: fetchWebhookLogs
   });
   
-  // Create webhook configuration mutation
   const createMutation = useMutation({
     mutationFn: (webhook: { url: string; is_active: boolean; event_type: string }) => 
       createWebhookConfiguration(webhook.url, webhook.event_type),
@@ -62,7 +59,6 @@ const Integrations = () => {
     }
   });
   
-  // Update webhook active status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => 
       updateWebhookConfiguration(id, { is_active: isActive }),
@@ -75,7 +71,6 @@ const Integrations = () => {
     }
   });
   
-  // Test webhook mutation
   const testWebhookMutation = useMutation({
     mutationFn: (id: string) => testWebhook(id),
     onSuccess: (data) => {
@@ -115,16 +110,14 @@ const Integrations = () => {
     });
   };
   
-  const handleTestWebhook = async (id: string) => {
-    try {
-      setTestingWebhook(id);
-      const result = await testWebhook(id);
-      toast.success('Webhook testado com sucesso!');
-    } catch (error: any) {
-      toast.error(`Erro ao testar webhook: ${error.message}`);
-    } finally {
-      setTestingWebhook(null);
-    }
+  const handleTestWebhook = (webhookId: string) => {
+    testWebhook(webhookId)
+      .then(() => {
+        toast.success('Webhook testado com sucesso');
+      })
+      .catch(error => {
+        toast.error(`Erro ao testar webhook: ${error.message}`);
+      });
   };
   
   const openTestDialog = (webhook: WebhookConfig) => {
@@ -133,7 +126,6 @@ const Integrations = () => {
     setIsTestDialogOpen(true);
   };
   
-  // Get status badge colors
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
@@ -365,7 +357,6 @@ const Integrations = () => {
         </Tabs>
       </div>
       
-      {/* Add Webhook Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -427,7 +418,6 @@ const Integrations = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Test Webhook Dialog */}
       <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
         <DialogContent>
           <DialogHeader>

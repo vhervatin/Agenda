@@ -1,374 +1,292 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import {
-  fetchCompanySettings,
-  updateCompanySettings,
-  createCompanySettings
-} from '@/services/api';
+import { Input } from '@/components/ui/input';
+import { createCompanySettings, fetchCompanySettings, updateCompanySettings } from '@/services/api';
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-const settingsSchema = z.object({
+const formSchema = z.object({
   name: z.string().min(2, {
     message: "O nome da empresa deve ter pelo menos 2 caracteres.",
   }),
-  slug: z.string().optional(),
-  logo_url: z.string().url("URL inválida").optional(),
+  slug: z.string().min(2, {
+    message: "O slug deve ter pelo menos 2 caracteres.",
+  }),
+  logo_url: z.string().optional(),
   primary_color: z.string().regex(/^#([0-9A-Fa-f]{3}){1,2}$/, {
-    message: "Cor primária inválida. Use um código hexadecimal (ex: #FFFFFF).",
+    message: "A cor primária deve ser um código hexadecimal válido.",
   }),
   secondary_color: z.string().regex(/^#([0-9A-Fa-f]{3}){1,2}$/, {
-    message: "Cor secundária inválida. Use um código hexadecimal (ex: #000000).",
+    message: "A cor secundária deve ser um código hexadecimal válido.",
   }),
 });
 
-const Settings = () => {
-  const queryClient = useQueryClient();
-  const [isSaving, setIsSaving] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [companySettings, setCompanySettings] = useState(null);
+interface SettingsProps {}
 
-  const { data: companyData, isLoading } = useQuery({
-    queryKey: ['companySettings'],
+const Settings: React.FC<SettingsProps> = () => {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('general');
+  const [submitting, setSubmitting] = useState(false);
+  
+  const { 
+    data: companySettings,
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ['company-settings'],
     queryFn: fetchCompanySettings,
   });
-
-  const form = useForm<z.infer<typeof settingsSchema>>({
-    resolver: zodResolver(settingsSchema),
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      name: companyData?.name || "",
-      slug: companyData?.slug || "",
-      logo_url: companyData?.logo_url || "",
-      primary_color: companyData?.primary_color || "#000000",
-      secondary_color: companyData?.secondary_color || "#FFFFFF",
+      name: companySettings?.name || "",
+      slug: companySettings?.slug || "",
+      logo_url: companySettings?.logo_url || "",
+      primary_color: companySettings?.primary_color || "#000000",
+      secondary_color: companySettings?.secondary_color || "#000000",
     },
     mode: "onChange",
   });
-
-  const handleSaveSettings = async (data: z.infer<typeof settingsSchema>) => {
+  
+  useEffect(() => {
+    if (companySettings) {
+      form.reset(companySettings);
+    }
+  }, [companySettings, form]);
+  
+  const handleCreateSettings = async () => {
     try {
-      setIsSaving(true);
+      setSubmitting(true);
       
-      const settings = {
-        ...data,
-        slug: data.slug.toLowerCase()
+      const settingsData = {
+        name: form.getValues('name'),
+        slug: form.getValues('slug'),
+        logo_url: form.getValues('logo_url'),
+        primary_color: form.getValues('primary_color'),
+        secondary_color: form.getValues('secondary_color')
       };
       
-      let updatedSettings;
+      const result = await createCompanySettings(settingsData);
       
-      if (companyData?.id) {
-        // If company exists, update it
-        updatedSettings = await updateCompanySettings({
-          ...settings,
-          id: companyData.id
-        });
-        toast.success('Configurações atualizadas com sucesso!');
-      } else {
-        // If company doesn't exist, create it
-        updatedSettings = await createCompanySettings(settings);
-        toast.success('Configurações criadas com sucesso!');
+      if (result) {
+        toast.success('Configurações da empresa criadas com sucesso');
+        queryClient.invalidateQueries({ queryKey: ['company-settings'] });
+        setActiveTab('customize');
       }
-      
-      // Refetch data if it was successful
-      queryClient.invalidateQueries({ queryKey: ['companySettings'] });
-    } catch (error: any) {
-      toast.error(`Erro ao salvar configurações: ${error.message}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSaveForm = async (data: z.infer<typeof settingsSchema>) => {
-    try {
-      setIsSaving(true);
-      
-      // Ensure we have a slug - generate one from name if not provided
-      const slug = data.slug || data.name.toLowerCase().replace(/\s+/g, '-');
-      
-      await createCompanySettings({
-        ...data,
-        slug
-      });
-      
-      toast.success('Configurações criadas com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['companySettings'] });
-      setIsFormOpen(false);
     } catch (error: any) {
       toast.error(`Erro ao criar configurações: ${error.message}`);
     } finally {
-      setIsSaving(false);
+      setSubmitting(false);
     }
   };
-
-  const handleCreate = async () => {
-    setLoading(true);
+  
+  const handleUpdateSettings = async () => {
+    if (!companySettings) return;
     
     try {
-      // Ensure all required fields are present
-      const companyData = {
-        name: formData.name || 'My Company', // Provide default values for required fields
-        slug: formData.slug,
-        logo_url: formData.logo_url,
-        primary_color: formData.primary_color || '#663399',
-        secondary_color: formData.secondary_color || '#FFA500'
+      setSubmitting(true);
+      
+      const settingsData = {
+        id: companySettings.id,
+        name: form.getValues('name'),
+        slug: form.getValues('slug'),
+        logo_url: form.getValues('logo_url'),
+        primary_color: form.getValues('primary_color'),
+        secondary_color: form.getValues('secondary_color')
       };
       
-      const result = await createCompanySettings(companyData);
+      const result = await updateCompanySettings(settingsData);
       
       if (result) {
-        toast.success("Configurações criadas com sucesso!");
-        setCompanySettings(result);
+        toast.success('Configurações atualizadas com sucesso');
+        queryClient.invalidateQueries({ queryKey: ['company-settings'] });
       }
     } catch (error: any) {
-      console.error("Error creating settings:", error);
-      toast.error(`Erro ao criar configurações: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (!companySettings?.id) return;
-    
-    setLoading(true);
-    
-    try {
-      // Ensure name is always provided
-      const updatedData = {
-        ...formData,
-        name: formData.name || companySettings.name || 'My Company'
-      };
-      
-      const result = await updateCompanySettings({
-        ...updatedData,
-        id: companySettings.id
-      });
-      
-      if (result) {
-        toast.success("Configurações atualizadas com sucesso!");
-        setCompanySettings(result);
-      }
-    } catch (error: any) {
-      console.error("Error updating settings:", error);
       toast.error(`Erro ao atualizar configurações: ${error.message}`);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
-
+  
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (companySettings) {
+      await handleUpdateSettings();
+    } else {
+      await handleCreateSettings();
+    }
+  };
+  
   return (
     <AdminLayout>
-      <div className="container mx-auto py-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Configurações da Empresa</h1>
-          <p className="text-muted-foreground">
-            Gerencie as configurações da sua empresa.
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalhes da Empresa</CardTitle>
-            <CardDescription>
-              Informações básicas sobre a sua empresa.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-6">
-            {isLoading ? (
-              <p>Carregando configurações...</p>
-            ) : companyData ? (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSaveSettings)} className="space-y-8">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome da Empresa</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome da Empresa" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="slug"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Slug</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Slug" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          O slug é usado na URL da sua empresa.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="logo_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>URL do Logo</FormLabel>
-                        <FormControl>
-                          <Input placeholder="URL do Logo" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="primary_color"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cor Primária</FormLabel>
-                        <FormControl>
-                          <Input type="color" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="secondary_color"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cor Secundária</FormLabel>
-                        <FormControl>
-                          <Input type="color" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? "Salvando..." : "Salvar Alterações"}
-                  </Button>
-                </form>
-              </Form>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-muted-foreground">
-                  Nenhuma configuração encontrada.
-                </p>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      Criar Configurações
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>Criar Configurações</DialogTitle>
-                      <DialogDescription>
-                        Crie as configurações da sua empresa.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(handleSaveForm)} className="space-y-8">
-                        <FormField
-                          control={form.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nome da Empresa</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Nome da Empresa" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="slug"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Slug</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Slug" {...field} />
-                              </FormControl>
-                              <FormDescription>
-                                O slug é usado na URL da sua empresa.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="logo_url"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>URL do Logo</FormLabel>
-                              <FormControl>
-                                <Input placeholder="URL do Logo" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="primary_color"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Cor Primária</FormLabel>
-                              <FormControl>
-                                <Input type="color" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="secondary_color"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Cor Secundária</FormLabel>
-                              <FormControl>
-                                <Input type="color" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button type="submit" disabled={isSaving}>
-                          {isSaving ? "Salvando..." : "Salvar"}
-                        </Button>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="p-6">
+        <h1 className="text-2xl font-bold mb-6">Configurações da Empresa</h1>
+        
+        <Tabs defaultValue="general" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="general">Geral</TabsTrigger>
+            <TabsTrigger value="customize" disabled={!companySettings}>
+              Personalização
+              {!companySettings && (
+                <AlertTriangle className="ml-1 h-4 w-4" />
+              )}
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="general" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Detalhes da Empresa</CardTitle>
+                <CardDescription>
+                  Informações básicas sobre a sua empresa.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <p>Carregando...</p>
+                ) : error ? (
+                  <p className="text-red-500">Erro ao carregar as configurações.</p>
+                ) : (
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nome da Empresa</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Nome da Empresa" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              Este é o nome que seus clientes verão.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="slug"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Slug</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Slug" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              O slug é usado na URL da sua empresa.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="logo_url"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>URL do Logo</FormLabel>
+                            <FormControl>
+                              <Input placeholder="URL do Logo" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              URL para o logo da sua empresa.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <Button type="submit" disabled={submitting}>
+                        {submitting
+                          ? 'Salvando...'
+                          : companySettings
+                            ? 'Atualizar'
+                            : 'Salvar'}
+                      </Button>
+                    </form>
+                  </Form>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="customize" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Personalização</CardTitle>
+                <CardDescription>
+                  Altere as cores da sua empresa.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <p>Carregando...</p>
+                ) : error ? (
+                  <p className="text-red-500">Erro ao carregar as configurações.</p>
+                ) : (
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="primary_color"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cor Primária</FormLabel>
+                            <FormControl>
+                              <Input type="color" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              A cor primária da sua empresa.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="secondary_color"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cor Secundária</FormLabel>
+                            <FormControl>
+                              <Input type="color" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              A cor secundária da sua empresa.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <Button type="submit" disabled={submitting}>
+                        {submitting
+                          ? 'Salvando...'
+                          : companySettings
+                            ? 'Atualizar'
+                            : 'Salvar'}
+                      </Button>
+                    </form>
+                  </Form>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminLayout>
   );

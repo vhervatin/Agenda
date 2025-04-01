@@ -176,7 +176,7 @@ const Companies = () => {
               </div>
               <div className="flex justify-end">
                 <Button type="submit">
-                  {createCompanyMutation.isLoading ? 'Criando...' : 'Criar Empresa'}
+                  {createCompanyMutation.isPending ? 'Criando...' : 'Criar Empresa'}
                 </Button>
               </div>
             </form>

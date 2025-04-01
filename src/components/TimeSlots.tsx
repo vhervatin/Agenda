@@ -7,6 +7,7 @@ export interface TimeSlot {
   id: string;
   time: string;
   available: boolean;
+  start_time?: string;
 }
 
 interface TimeSlotsProps {
@@ -20,7 +21,24 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   selectedSlot,
   onSelectTimeSlot
 }) => {
-  if (timeSlots.length === 0) {
+  // Filter out past time slots if the date is today
+  const currentTime = new Date();
+  
+  const filteredTimeSlots = timeSlots.filter(slot => {
+    if (!slot.start_time) return true;
+    
+    const slotTime = new Date(slot.start_time);
+    const isToday = new Date().toDateString() === slotTime.toDateString();
+    
+    // Only filter out past times if the slot is for today
+    if (isToday) {
+      return slotTime > currentTime;
+    }
+    
+    return true;
+  });
+  
+  if (filteredTimeSlots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-muted-foreground animate-fade-in">
         <Clock className="h-8 w-8 mb-2 opacity-50" />
@@ -34,7 +52,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
     <div className="animate-slide-up">
       <h3 className="text-base font-medium mb-3">Horários disponíveis</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-        {timeSlots.map((slot) => (
+        {filteredTimeSlots.map((slot) => (
           <button
             key={slot.id}
             onClick={() => slot.available && onSelectTimeSlot(slot.id)}

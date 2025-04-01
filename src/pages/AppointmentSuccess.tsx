@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState } from 'react';
-import { Link, useParams, useLocation } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, ArrowLeft, Calendar, Clock, User, Clipboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -7,26 +8,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchAppointmentById } from '@/services/api';
 import { Appointment } from '@/types/types';
 import NavBar from '@/components/NavBar';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 const AppointmentSuccess = () => {
-  const { id } = useParams<{ id: string }>();
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  
-  const appointmentFromState = location.state?.appointment as Appointment | undefined;
   
   useEffect(() => {
-    if (appointmentFromState) {
-      console.log('Using appointment from state:', appointmentFromState);
-      setAppointment(appointmentFromState);
-      setLoading(false);
-      return;
-    }
-    
     const loadAppointment = async () => {
       try {
         if (!id) {
@@ -54,7 +45,7 @@ const AppointmentSuccess = () => {
     };
     
     loadAppointment();
-  }, [id, appointmentFromState]);
+  }, [id]);
   
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Data não disponível';
@@ -184,7 +175,7 @@ const AppointmentSuccess = () => {
                 <p className="font-medium">{appointment?.services?.name || 'Serviço não especificado'}</p>
                 {appointment?.services && (
                   <p className="text-sm text-muted-foreground">
-                    {appointment.services.duration} minutos • R$ {appointment.services.price.toFixed(2)}
+                    {appointment.services.duration} minutos • R$ {appointment.services.price.toFixed(2).replace('.', ',')}
                   </p>
                 )}
               </div>
@@ -201,29 +192,17 @@ const AppointmentSuccess = () => {
             </div>
           </CardContent>
           <CardFooter>
-            <div className="border-t w-full pt-4 text-center text-sm text-muted-foreground">
-              Você receberá um lembrete antes do seu agendamento.
-            </div>
+            <Button asChild className="w-full">
+              <Link to="/">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar para o início
+              </Link>
+            </Button>
           </CardFooter>
         </Card>
-        
-        <div className="flex flex-col space-y-3">
-          <Button asChild variant="default">
-            <Link to="/appointments">
-              Ver meus agendamentos
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar para o início
-            </Link>
-          </Button>
-        </div>
       </div>
     </>
   );
 };
 
 export default AppointmentSuccess;
-

@@ -5,10 +5,10 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
-import { CheckCircle, XCircle, RotateCcw, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Clock, Plus } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, parseISO, isToday, isAfter, isBefore } from 'date-fns';
@@ -25,6 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TimeRange } from '@/types/types';
 
 const BulkScheduleFormSchema = z.object({
   professionalId: z.string().min(1, {
@@ -81,19 +82,16 @@ const Schedule = () => {
   const [isBulkModalOpen, setBulkModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
-  // Fetch professionals
   const { data: professionals = [] } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
   
-  // Fetch appointments
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
     queryKey: ['appointments'],
     queryFn: fetchAppointments
   });
   
-  // Update appointment status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' | 'completed' }) => 
       updateAppointmentStatus(id, status),
@@ -122,24 +120,20 @@ const Schedule = () => {
     setIsStatusDialogOpen(true);
   };
   
-  // Filter appointments based on selected date and status
   const filteredAppointments = appointments.filter(appointment => {
     if (!appointment.slots?.start_time) return false;
     
     const appointmentDate = new Date(appointment.slots.start_time);
     
-    // Apply date filter
     const dateMatch = selectedDate 
       ? appointmentDate.toDateString() === selectedDate.toDateString() 
       : true;
     
-    // Apply status filter
     const statusMatch = filterStatus === 'all' || appointment.status === filterStatus;
     
     return dateMatch && statusMatch;
   });
   
-  // Group appointments by date
   const appointmentsByDate = filteredAppointments.reduce((acc, appointment) => {
     if (!appointment.slots?.start_time) return acc;
     
@@ -157,12 +151,10 @@ const Schedule = () => {
     return new Date(a).getTime() - new Date(b).getTime();
   });
   
-  // Get counts of appointments by status
   const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
   const completedCount = appointments.filter(a => a.status === 'completed').length;
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
   
-  // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -176,7 +168,6 @@ const Schedule = () => {
     }
   };
   
-  // Get status icon
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -190,7 +181,6 @@ const Schedule = () => {
     }
   };
   
-  // Format appointment time
   const formatAppointmentTime = (startTime: string, endTime?: string) => {
     if (!startTime) return '-';
     
@@ -216,7 +206,6 @@ const Schedule = () => {
     try {
       setSubmitting(true);
 
-      // Ensure all timeRanges have required fields
       const formattedTimeRanges: TimeRange[] = form.timeRanges.map(range => ({
         startHour: range.startHour,
         startMinute: range.startMinute,
@@ -249,7 +238,15 @@ const Schedule = () => {
   return (
     <AdminLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Agendamentos</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Agendamentos</h1>
+          <Button 
+            onClick={() => setBulkModalOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> Criar Horários
+          </Button>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
@@ -358,7 +355,7 @@ const Schedule = () => {
                 )}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardFooter>
               {isLoadingAppointments ? (
                 <div className="text-center py-8">Carregando agendamentos...</div>
               ) : filteredAppointments.length === 0 ? (
@@ -431,13 +428,11 @@ const Schedule = () => {
                   ))}
                 </div>
               )}
-            </CardContent>
+            </CardFooter>
           </Card>
         </div>
-        <Button onClick={() => setBulkModalOpen(true)}>Criar Horários em Massa</Button>
       </div>
       
-      {/* Update Status Dialog */}
       <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -503,7 +498,6 @@ const Schedule = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Create Modal */}
       <Dialog open={isBulkModalOpen} onOpenChange={setBulkModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
