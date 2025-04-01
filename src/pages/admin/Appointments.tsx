@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -27,6 +28,7 @@ const AppointmentsAdmin = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   
+  // Define the filters object for API query
   const filters = {
     date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
     status: filterStatus !== 'all' ? filterStatus : undefined
@@ -37,6 +39,7 @@ const AppointmentsAdmin = () => {
     queryFn: fetchProfessionals
   });
   
+  // Fetch appointments with current filters
   const { 
     data: appointments = [], 
     isLoading, 
@@ -49,6 +52,7 @@ const AppointmentsAdmin = () => {
   console.log('Appointments data:', appointments);
   console.log('Current filters:', filters);
   
+  // Update appointment status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' | 'completed' }) => 
       updateAppointmentStatus(id, status),
@@ -77,27 +81,8 @@ const AppointmentsAdmin = () => {
     setIsStatusDialogOpen(true);
   };
   
-  const filteredAppointments = appointments.filter(appointment => {
-    if (!appointment.slots) return false;
-    
-    if (selectedDate && appointment.appointment_date) {
-      const appointmentDate = new Date(appointment.appointment_date);
-      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-      const appointmentDateStr = format(appointmentDate, 'yyyy-MM-dd');
-      
-      if (appointmentDateStr !== selectedDateStr) {
-        return false;
-      }
-    }
-    
-    if (filterStatus !== 'all' && appointment.status !== filterStatus) {
-      return false;
-    }
-    
-    return true;
-  });
-  
-  const appointmentsByDate = filteredAppointments.reduce((acc, appointment) => {
+  // Group appointments by date
+  const appointmentsByDate = appointments.reduce((acc, appointment) => {
     if (!appointment.appointment_date) return acc;
     
     const dateStr = new Date(appointment.appointment_date).toDateString();
@@ -110,14 +95,17 @@ const AppointmentsAdmin = () => {
     return acc;
   }, {} as Record<string, any[]>);
   
+  // Sort dates
   const sortedDates = Object.keys(appointmentsByDate).sort((a, b) => {
     return new Date(a).getTime() - new Date(b).getTime();
   });
   
+  // Calculate appointment counts by status
   const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
   const completedCount = appointments.filter(a => a.status === 'completed').length;
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
   
+  // Helper functions for UI
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -269,7 +257,7 @@ const AppointmentsAdmin = () => {
             <CardContent>
               {isLoading ? (
                 <div className="text-center py-8">Carregando agendamentos...</div>
-              ) : filteredAppointments.length === 0 ? (
+              ) : sortedDates.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   Nenhum agendamento encontrado com os filtros selecionados.
                 </div>
