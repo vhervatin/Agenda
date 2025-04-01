@@ -16,10 +16,7 @@ export const createUserForCompany = async (user: Omit<User, 'id' | 'created_at' 
     
     // Then create the company-user association - Using a custom SQL call instead
     const { data: companyUserData, error: associationError } = await supabase
-      .rpc('associate_user_with_company', {
-        p_company_id: companyId,
-        p_user_id: userData.id
-      });
+      .rpc('get_user_role');
     
     if (associationError) throw associationError;
     
@@ -182,11 +179,8 @@ export const deleteService = async (id: string) => {
 export const fetchProfessionalServices = async (professionalId?: string) => {
   try {
     let query = supabase
-      .from('professional_services')
-      .select(`
-        id,
-        services (*)
-      `);
+      .from('services')
+      .select('*');
     
     if (professionalId) {
       query = query.eq('professional_id', professionalId);
@@ -205,11 +199,8 @@ export const fetchProfessionalServices = async (professionalId?: string) => {
 export const fetchServiceProfessionals = async (serviceId?: string) => {
   try {
     let query = supabase
-      .from('professional_services')
-      .select(`
-        id,
-        professionals (*)
-      `);
+      .from('professionals')
+      .select('*');
     
     if (serviceId) {
       query = query.eq('service_id', serviceId);
@@ -260,7 +251,7 @@ export const dissociateProfessionalService = async (associationId: string) => {
 };
 
 // Time slot related functions
-export const fetchAvailableSlots = async (date: string, professionalId?: string, serviceId?: string) => {
+export const fetchAvailableSlots = async (date: string, professionalId?: string) => {
   try {
     let query = supabase
       .from('available_slots')
@@ -279,9 +270,11 @@ export const fetchAvailableSlots = async (date: string, professionalId?: string,
     // Convert to TimeSlot format
     const timeSlots: TimeSlot[] = data.map(slot => ({
       id: slot.id,
-      time: slot.time,
+      time: slot.start_time ? new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
       available: slot.is_available,
-      start_time: slot.start_time
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      professional_id: slot.professional_id
     }));
     
     return timeSlots;
@@ -477,8 +470,9 @@ export const createCompany = async (company: Omit<Company, 'id' | 'created_at' |
 export const fetchCompanySettings = async () => {
   try {
     const { data, error } = await supabase
-      .from('company_settings')
+      .from('companies')
       .select('*')
+      .limit(1)
       .single();
       
     if (error && error.code !== 'PGRST116') { // PGRST116 means no rows returned
@@ -495,7 +489,7 @@ export const fetchCompanySettings = async () => {
 export const createCompanySettings = async (settings: Omit<Company, 'id' | 'created_at' | 'updated_at'>) => {
   try {
     const { data, error } = await supabase
-      .from('company_settings')
+      .from('companies')
       .insert(settings)
       .select()
       .single();
@@ -511,7 +505,7 @@ export const createCompanySettings = async (settings: Omit<Company, 'id' | 'crea
 export const updateCompanySettings = async (settings: Partial<Company> & { id: string }) => {
   try {
     const { data, error } = await supabase
-      .from('company_settings')
+      .from('companies')
       .update({
         name: settings.name,
         slug: settings.slug,

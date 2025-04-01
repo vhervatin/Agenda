@@ -1,3 +1,4 @@
+
 export interface Service {
   id: string;
   name: string;
@@ -5,6 +6,7 @@ export interface Service {
   price: number;
   description: string;
   active: boolean;
+  services?: Service; // For nested service objects from the API
 }
 
 export interface Professional {
@@ -13,6 +15,7 @@ export interface Professional {
   bio: string;
   photo_url: string;
   active: boolean;
+  professionals?: Professional; // For nested professional objects from the API
 }
 
 export interface TimeSlot {

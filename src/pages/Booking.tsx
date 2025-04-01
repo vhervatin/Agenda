@@ -56,7 +56,8 @@ const Booking = () => {
   
   useEffect(() => {
     if (selectedProfessional && selectedDate) {
-      fetchAvailableSlots(selectedProfessional, selectedDate)
+      const formattedDate = selectedDate.toISOString().split('T')[0];
+      fetchAvailableSlots(formattedDate, selectedProfessional)
         .then(slots => {
           setTimeSlots(slots);
           setSelectedTimeSlot(null);
@@ -163,16 +164,25 @@ const Booking = () => {
       return;
     }
     
+    if (!selectedTimeObject || !selectedDate) {
+      toast.error("Por favor, selecione um horário válido");
+      return;
+    }
+    
     setIsSubmitting(true);
     
-    createAppointment(
-      selectedProfessional,
-      selectedService,
-      selectedTimeSlot,
-      clientName,
-      clientPhone,
-      clientCpf
-    )
+    const appointment = {
+      professional_id: selectedProfessional,
+      service_id: selectedService,
+      slot_id: selectedTimeSlot,
+      client_name: clientName,
+      client_phone: clientPhone,
+      client_cpf: clientCpf,
+      status: 'confirmed' as const,
+      appointment_date: selectedTimeObject.start_time || new Date().toISOString()
+    };
+    
+    createAppointment(appointment)
       .then(result => {
         setIsSubmitting(false);
         toast.success("Agendamento confirmado com sucesso!");
@@ -211,7 +221,10 @@ const Booking = () => {
     return `${hours}h ${remainingMinutes}min`;
   };
   
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | undefined) => {
+    if (price === undefined || price === null) {
+      return 'Preço indisponível';
+    }
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
   };
   
@@ -232,18 +245,21 @@ const Booking = () => {
               <div className="text-center py-8">Nenhum serviço disponível no momento.</div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
-                {services.map((service) => (
-                  <ServiceItem
-                    key={service.id}
-                    id={service.id}
-                    name={service.name}
-                    duration={formatDuration(service.duration)}
-                    price={formatPrice(service.price)}
-                    description={service.description}
-                    selected={service.id === selectedService}
-                    onSelect={setSelectedService}
-                  />
-                ))}
+                {services.map((service) => {
+                  const serviceData = service.services || service;
+                  return (
+                    <ServiceItem
+                      key={service.id}
+                      id={service.id}
+                      name={serviceData.name || 'Serviço sem nome'}
+                      duration={formatDuration(serviceData.duration || 0)}
+                      price={formatPrice(serviceData.price)}
+                      description={serviceData.description || ''}
+                      selected={service.id === selectedService}
+                      onSelect={setSelectedService}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -261,17 +277,20 @@ const Booking = () => {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
-                {professionals.map((professional) => (
-                  <ProfessionalItem
-                    key={professional.id}
-                    id={professional.id}
-                    name={professional.name}
-                    photoUrl={professional.photo_url}
-                    bio={professional.bio}
-                    selected={professional.id === selectedProfessional}
-                    onSelect={setSelectedProfessional}
-                  />
-                ))}
+                {professionals.map((professional) => {
+                  const professionalData = professional.professionals || professional;
+                  return (
+                    <ProfessionalItem
+                      key={professional.id}
+                      id={professional.id}
+                      name={professionalData.name || 'Profissional sem nome'}
+                      photoUrl={professionalData.photo_url || ''}
+                      bio={professionalData.bio || ''}
+                      selected={professional.id === selectedProfessional}
+                      onSelect={setSelectedProfessional}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -315,13 +334,15 @@ const Booking = () => {
           <div className="max-w-md mx-auto">
             <AppointmentSummary
               service={{
-                name: selectedServiceObject?.name || '',
-                duration: selectedServiceObject ? formatDuration(selectedServiceObject.duration) : '',
-                price: selectedServiceObject ? formatPrice(selectedServiceObject.price) : '',
+                name: selectedServiceObject?.services?.name || selectedServiceObject?.name || '',
+                duration: selectedServiceObject ? 
+                  formatDuration(selectedServiceObject.services?.duration || selectedServiceObject.duration || 0) : '',
+                price: selectedServiceObject ? 
+                  formatPrice(selectedServiceObject.services?.price || selectedServiceObject.price) : '',
               }}
               date={selectedDate}
               time={selectedTimeObject?.time || null}
-              professionalName={selectedProfessionalObject?.name || ''}
+              professionalName={selectedProfessionalObject?.professionals?.name || selectedProfessionalObject?.name || ''}
               clientName={clientName}
               clientPhone={clientPhone}
               clientCpf={clientCpf}
