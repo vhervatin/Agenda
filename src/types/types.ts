@@ -14,6 +14,7 @@ export interface Professional {
   name: string;
   bio: string;
   photo_url: string;
+  phone?: string; // Added phone field to match admin interface
   active: boolean;
   professionals?: Professional; // For nested professional objects from the API
 }
@@ -60,11 +61,13 @@ export interface WebhookConfiguration {
 
 export interface WebhookLog {
   id: string;
-  webhook_configuration_id: string;
-  request_payload: string;
-  response_status: number;
-  response_body: string;
-  created_at: string;
+  webhook_id?: string;
+  event_type: string;
+  payload?: any;
+  status?: string;
+  attempts?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Company {
@@ -87,4 +90,11 @@ export interface User {
   auth_id: string;
   created_at: string;
   updated_at: string;
+}
+
+// Add interface for professional-service association
+export interface ProfessionalService {
+  id: string;
+  professional_id: string;
+  service_id: string;
 }

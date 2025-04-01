@@ -245,21 +245,18 @@ const Booking = () => {
               <div className="text-center py-8">Nenhum serviço disponível no momento.</div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
-                {services.map((service) => {
-                  const serviceData = service.services || service;
-                  return (
-                    <ServiceItem
-                      key={service.id}
-                      id={service.id}
-                      name={serviceData.name || 'Serviço sem nome'}
-                      duration={formatDuration(serviceData.duration || 0)}
-                      price={formatPrice(serviceData.price)}
-                      description={serviceData.description || ''}
-                      selected={service.id === selectedService}
-                      onSelect={setSelectedService}
-                    />
-                  );
-                })}
+                {services.map((service) => (
+                  <ServiceItem
+                    key={service.id}
+                    id={service.id}
+                    name={service.name || 'Serviço sem nome'}
+                    duration={formatDuration(service.duration || 0)}
+                    price={formatPrice(service.price)}
+                    description={service.description || ''}
+                    selected={service.id === selectedService}
+                    onSelect={setSelectedService}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -277,20 +274,17 @@ const Booking = () => {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
-                {professionals.map((professional) => {
-                  const professionalData = professional.professionals || professional;
-                  return (
-                    <ProfessionalItem
-                      key={professional.id}
-                      id={professional.id}
-                      name={professionalData.name || 'Profissional sem nome'}
-                      photoUrl={professionalData.photo_url || ''}
-                      bio={professionalData.bio || ''}
-                      selected={professional.id === selectedProfessional}
-                      onSelect={setSelectedProfessional}
-                    />
-                  );
-                })}
+                {professionals.map((professional) => (
+                  <ProfessionalItem
+                    key={professional.id}
+                    id={professional.id}
+                    name={professional.name || 'Profissional sem nome'}
+                    photoUrl={professional.photo_url || ''}
+                    bio={professional.bio || ''}
+                    selected={professional.id === selectedProfessional}
+                    onSelect={setSelectedProfessional}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -334,15 +328,15 @@ const Booking = () => {
           <div className="max-w-md mx-auto">
             <AppointmentSummary
               service={{
-                name: selectedServiceObject?.services?.name || selectedServiceObject?.name || '',
+                name: selectedServiceObject?.name || '',
                 duration: selectedServiceObject ? 
-                  formatDuration(selectedServiceObject.services?.duration || selectedServiceObject.duration || 0) : '',
+                  formatDuration(selectedServiceObject.duration || 0) : '',
                 price: selectedServiceObject ? 
-                  formatPrice(selectedServiceObject.services?.price || selectedServiceObject.price) : '',
+                  formatPrice(selectedServiceObject.price) : '',
               }}
               date={selectedDate}
               time={selectedTimeObject?.time || null}
-              professionalName={selectedProfessionalObject?.professionals?.name || selectedProfessionalObject?.name || ''}
+              professionalName={selectedProfessionalObject?.name || ''}
               clientName={clientName}
               clientPhone={clientPhone}
               clientCpf={clientCpf}

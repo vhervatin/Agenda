@@ -34,25 +34,21 @@ const Services = () => {
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>('');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   
-  // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   
-  // Fetch services
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
     queryKey: ['services'],
     queryFn: fetchServices
   });
   
-  // Fetch professionals
   const { data: professionals = [], isLoading: isLoadingProfessionals } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
   
-  // Create service mutation
   const createMutation = useMutation({
     mutationFn: createService,
     onSuccess: () => {
@@ -66,7 +62,6 @@ const Services = () => {
     }
   });
   
-  // Update service mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Service> }) => 
       updateService(id, data),
@@ -81,7 +76,6 @@ const Services = () => {
     }
   });
   
-  // Delete service mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteService(id),
     onSuccess: () => {
@@ -94,7 +88,6 @@ const Services = () => {
     }
   });
   
-  // Associate service to professional mutation
   const associateMutation = useMutation({
     mutationFn: ({ professionalId, serviceId }: { professionalId: string; serviceId: string }) => 
       associateProfessionalService(professionalId, serviceId),
@@ -105,8 +98,12 @@ const Services = () => {
       setSelectedProfessionalId('');
       setSelectedServiceId('');
     },
-    onError: (error) => {
-      toast.error(`Erro ao associar serviço: ${error.message}`);
+    onError: (error: any) => {
+      if (error.message && error.message.includes('duplicate key')) {
+        toast.error('Esta associação já existe');
+      } else {
+        toast.error(`Erro ao associar serviço: ${error.message}`);
+      }
     }
   });
   
@@ -182,7 +179,6 @@ const Services = () => {
     setIsDeleteDialogOpen(true);
   };
   
-  // Format duration display
   const formatDuration = (minutes: number) => {
     if (minutes < 60) {
       return `${minutes} min`;
@@ -198,7 +194,6 @@ const Services = () => {
     return `${hours}h ${remainingMinutes}min`;
   };
   
-  // Format price display
   const formatPrice = (price: number) => {
     return `R$ ${price.toFixed(2).replace('.', ',')}`;
   };
@@ -412,7 +407,6 @@ const Services = () => {
         </Card>
       </div>
       
-      {/* Edit Service Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -481,7 +475,6 @@ const Services = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

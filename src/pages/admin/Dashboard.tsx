@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -63,8 +62,11 @@ const Dashboard = () => {
   });
   
   // Fetch appointments
-  const { data: appointments = [] } = useQuery({
-    queryKey: ['appointments'],
+  const { 
+    data: appointments = [], 
+    isLoading: isLoadingAppointments 
+  } = useQuery({
+    queryKey: ['appointments', { status: 'confirmed' }],
     queryFn: fetchAppointments
   });
   

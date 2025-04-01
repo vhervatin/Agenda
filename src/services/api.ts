@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Company, User, Service, Professional, TimeSlot, Appointment, WebhookConfiguration, WebhookLog } from '@/types/types';
 
@@ -183,13 +182,23 @@ export const fetchProfessionalServices = async (professionalId?: string) => {
       .select('*');
     
     if (professionalId) {
-      query = query.eq('professional_id', professionalId);
+      // Use a join with professional_services to filter services by professional
+      query = supabase
+        .from('professional_services')
+        .select('services:service_id(*)')
+        .eq('professional_id', professionalId);
     }
     
     const { data, error } = await query;
     
     if (error) throw error;
-    return data;
+    
+    // Transform the data to match the expected format
+    if (professionalId && data) {
+      return data.map(item => item.services);
+    }
+    
+    return data || [];
   } catch (error) {
     console.error('Error fetching professional services:', error);
     return [];
@@ -198,18 +207,24 @@ export const fetchProfessionalServices = async (professionalId?: string) => {
 
 export const fetchServiceProfessionals = async (serviceId?: string) => {
   try {
-    let query = supabase
-      .from('professionals')
-      .select('*');
-    
-    if (serviceId) {
-      query = query.eq('service_id', serviceId);
+    if (!serviceId) {
+      return await fetchProfessionals();
     }
     
-    const { data, error } = await query;
+    // Use a join with professional_services to filter professionals by service
+    const { data, error } = await supabase
+      .from('professional_services')
+      .select('professionals:professional_id(*)')
+      .eq('service_id', serviceId);
     
     if (error) throw error;
-    return data;
+    
+    // Transform the data to match the expected format
+    if (data) {
+      return data.map(item => item.professionals);
+    }
+    
+    return [];
   } catch (error) {
     console.error('Error fetching service professionals:', error);
     return [];
@@ -218,6 +233,21 @@ export const fetchServiceProfessionals = async (serviceId?: string) => {
 
 export const associateProfessionalService = async (professionalId: string, serviceId: string) => {
   try {
+    // First check if the association already exists to avoid duplicate key error
+    const { data: existingAssociations, error: checkError } = await supabase
+      .from('professional_services')
+      .select('*')
+      .eq('professional_id', professionalId)
+      .eq('service_id', serviceId);
+    
+    if (checkError) throw checkError;
+    
+    // If the association already exists, return it
+    if (existingAssociations && existingAssociations.length > 0) {
+      return existingAssociations[0];
+    }
+    
+    // Otherwise, create a new association
     const { data, error } = await supabase
       .from('professional_services')
       .insert({
@@ -339,8 +369,13 @@ export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'c
   }
 };
 
-export const fetchAppointments = async (filters?: { status?: string; date?: string; professional_id?: string }) => {
+export const fetchAppointments = async (context: any) => {
   try {
+    let filters = {};
+    if (context && context.queryKey && context.queryKey.length > 1) {
+      filters = context.queryKey[1] || {};
+    }
+    
     let query = supabase
       .from('appointments')
       .select(`
@@ -352,16 +387,18 @@ export const fetchAppointments = async (filters?: { status?: string; date?: stri
       .order('appointment_date', { ascending: false });
     
     if (filters) {
-      if (filters.status) {
-        query = query.eq('status', filters.status);
+      const typedFilters = filters as { status?: string; date?: string; professional_id?: string };
+      
+      if (typedFilters.status) {
+        query = query.eq('status', typedFilters.status);
       }
       
-      if (filters.date) {
-        query = query.eq('appointment_date', filters.date);
+      if (typedFilters.date) {
+        query = query.eq('appointment_date', typedFilters.date);
       }
       
-      if (filters.professional_id) {
-        query = query.eq('professional_id', filters.professional_id);
+      if (typedFilters.professional_id) {
+        query = query.eq('professional_id', typedFilters.professional_id);
       }
     }
     
@@ -541,15 +578,20 @@ export const fetchWebhookConfigurations = async () => {
   }
 };
 
-export const fetchWebhookLogs = async (configId?: string) => {
+export const fetchWebhookLogs = async (context: any) => {
   try {
+    let configId;
+    if (context && context.queryKey && context.queryKey.length > 1) {
+      configId = context.queryKey[1];
+    }
+    
     let query = supabase
       .from('webhook_logs')
       .select('*')
       .order('created_at', { ascending: false });
     
     if (configId) {
-      query = query.eq('webhook_configuration_id', configId);
+      query = query.eq('webhook_id', configId);
     }
     
     const { data, error } = await query;

@@ -94,8 +94,8 @@ const Professionals = () => {
     createMutation.mutate({
       name,
       bio,
-      phone,
       photo_url: photoUrl,
+      phone, // This now matches our updated type
       active: true
     });
   };
@@ -111,8 +111,8 @@ const Professionals = () => {
       data: {
         name,
         bio,
-        phone,
-        photo_url: photoUrl
+        photo_url: photoUrl,
+        phone // This now matches our updated type
       }
     });
   };

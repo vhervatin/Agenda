@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +19,7 @@ import {
   updateAppointmentStatus
 } from '@/services/api';
 
-const Appointments = () => {
+const AppointmentsAdmin = () => {
   const queryClient = useQueryClient();
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
@@ -34,9 +33,13 @@ const Appointments = () => {
     queryFn: fetchProfessionals
   });
   
-  // Fetch appointments
-  const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
-    queryKey: ['appointments'],
+  // Update the query to use the new fetchAppointments function
+  const { 
+    data: appointments = [], 
+    isLoading, 
+    refetch 
+  } = useQuery({
+    queryKey: ['appointments', filters],
     queryFn: fetchAppointments
   });
   
@@ -261,7 +264,7 @@ const Appointments = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingAppointments ? (
+              {isLoading ? (
                 <div className="text-center py-8">Carregando agendamentos...</div>
               ) : filteredAppointments.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
@@ -407,4 +410,4 @@ const Appointments = () => {
   );
 };
 
-export default Appointments;
+export default AppointmentsAdmin;
