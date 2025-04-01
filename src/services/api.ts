@@ -177,28 +177,27 @@ export const deleteService = async (id: string) => {
 // Professional-Service association
 export const fetchProfessionalServices = async (professionalId?: string) => {
   try {
-    let query = supabase
-      .from('services')
-      .select('*');
-    
-    if (professionalId) {
-      // Use a join with professional_services to filter services by professional
-      query = supabase
-        .from('professional_services')
-        .select('services:service_id(*)')
-        .eq('professional_id', professionalId);
+    if (!professionalId) {
+      return await fetchServices();
     }
     
-    const { data, error } = await query;
+    // Use a join with professional_services to filter services by professional
+    const { data, error } = await supabase
+      .from('professional_services')
+      .select(`
+        service_id,
+        services:service_id (*)
+      `)
+      .eq('professional_id', professionalId);
     
     if (error) throw error;
     
     // Transform the data to match the expected format
-    if (professionalId && data) {
+    if (data) {
       return data.map(item => item.services);
     }
     
-    return data || [];
+    return [];
   } catch (error) {
     console.error('Error fetching professional services:', error);
     return [];
@@ -283,12 +282,30 @@ export const dissociateProfessionalService = async (associationId: string) => {
 // Time slot related functions
 export const fetchAvailableSlots = async (date: string, professionalId?: string) => {
   try {
+    // Extract the date part to filter by appointment date
+    const formattedDate = date;
+    
+    console.log('Fetching slots for date:', formattedDate);
+    
     let query = supabase
       .from('available_slots')
-      .select('*')
-      .eq('date', date)
-      .eq('is_available', true);
+      .select('*');
     
+    // Add filter for date based on start_time
+    if (formattedDate) {
+      // Since the column 'date' doesn't exist, we need to filter by start_time
+      const startOfDay = `${formattedDate}T00:00:00.000Z`;
+      const endOfDay = `${formattedDate}T23:59:59.999Z`;
+      
+      query = query
+        .gte('start_time', startOfDay)
+        .lte('start_time', endOfDay);
+    }
+    
+    // Add filter for is_available
+    query = query.eq('is_available', true);
+    
+    // Add filter for professional_id if provided
     if (professionalId) {
       query = query.eq('professional_id', professionalId);
     }
@@ -297,14 +314,17 @@ export const fetchAvailableSlots = async (date: string, professionalId?: string)
     
     if (error) throw error;
     
+    console.log('Available slots data:', data);
+    
     // Convert to TimeSlot format
-    const timeSlots: TimeSlot[] = data.map(slot => ({
+    const timeSlots: TimeSlot[] = (data || []).map(slot => ({
       id: slot.id,
       time: slot.start_time ? new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
       available: slot.is_available,
       start_time: slot.start_time,
       end_time: slot.end_time,
-      professional_id: slot.professional_id
+      professional_id: slot.professional_id,
+      is_available: slot.is_available
     }));
     
     return timeSlots;
@@ -371,9 +391,9 @@ export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'c
 
 export const fetchAppointments = async (context: any) => {
   try {
-    let filters = {};
+    let queryFilters = {};
     if (context && context.queryKey && context.queryKey.length > 1) {
-      filters = context.queryKey[1] || {};
+      queryFilters = context.queryKey[1] || {};
     }
     
     let query = supabase
@@ -386,8 +406,8 @@ export const fetchAppointments = async (context: any) => {
       `)
       .order('appointment_date', { ascending: false });
     
-    if (filters) {
-      const typedFilters = filters as { status?: string; date?: string; professional_id?: string };
+    if (queryFilters) {
+      const typedFilters = queryFilters as { status?: string; date?: string; professional_id?: string };
       
       if (typedFilters.status) {
         query = query.eq('status', typedFilters.status);

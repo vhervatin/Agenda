@@ -27,13 +27,16 @@ const AppointmentsAdmin = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [filterStatus, setFilterStatus] = useState<string>('all');
   
-  // Fetch professionals
+  const filters = {
+    date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
+    status: filterStatus !== 'all' ? filterStatus : undefined
+  };
+  
   const { data: professionals = [] } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
   
-  // Update the query to use the new fetchAppointments function
   const { 
     data: appointments = [], 
     isLoading, 
@@ -43,7 +46,6 @@ const AppointmentsAdmin = () => {
     queryFn: fetchAppointments
   });
   
-  // Update appointment status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' | 'completed' }) => 
       updateAppointmentStatus(id, status),
@@ -72,24 +74,20 @@ const AppointmentsAdmin = () => {
     setIsStatusDialogOpen(true);
   };
   
-  // Filter appointments based on selected date and status
   const filteredAppointments = appointments.filter(appointment => {
     if (!appointment.slots?.start_time) return false;
     
     const appointmentDate = new Date(appointment.slots.start_time);
     
-    // Apply date filter
     const dateMatch = selectedDate 
       ? appointmentDate.toDateString() === selectedDate.toDateString() 
       : true;
     
-    // Apply status filter
     const statusMatch = filterStatus === 'all' || appointment.status === filterStatus;
     
     return dateMatch && statusMatch;
   });
   
-  // Group appointments by date
   const appointmentsByDate = filteredAppointments.reduce((acc, appointment) => {
     if (!appointment.slots?.start_time) return acc;
     
@@ -107,12 +105,10 @@ const AppointmentsAdmin = () => {
     return new Date(a).getTime() - new Date(b).getTime();
   });
   
-  // Get counts of appointments by status
   const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
   const completedCount = appointments.filter(a => a.status === 'completed').length;
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
   
-  // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -126,7 +122,6 @@ const AppointmentsAdmin = () => {
     }
   };
   
-  // Get status icon
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -140,7 +135,6 @@ const AppointmentsAdmin = () => {
     }
   };
   
-  // Format appointment time
   const formatAppointmentTime = (startTime: string, endTime?: string) => {
     if (!startTime) return '-';
     
@@ -341,7 +335,6 @@ const AppointmentsAdmin = () => {
         </div>
       </div>
       
-      {/* Update Status Dialog */}
       <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>

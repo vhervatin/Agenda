@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parse, addDays } from 'date-fns';
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ScheduleForm from '@/components/admin/ScheduleForm';
-import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments } from '@/services/api';
+import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments, fetchProfessionals } from '@/services/api';
 import { TimeRange } from '@/types/types';
 import { ptBR } from 'date-fns/locale';
 
@@ -56,10 +57,19 @@ const Schedule = () => {
     endMinute: '00',
   });
   
+  // Get the date string for the API
+  const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  
+  // Fetch professionals for the form
+  const { data: professionals = [] } = useQuery({
+    queryKey: ['professionals'],
+    queryFn: fetchProfessionals
+  });
+  
   const { data: availableSlotsData = [], isLoading: isLoadingAvailableSlots } = useQuery({
-    queryKey: ['availableSlots', selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined],
-    queryFn: () => selectedDate ? fetchAvailableSlots(format(selectedDate, 'yyyy-MM-dd')) : Promise.resolve([]),
-    enabled: !!selectedDate
+    queryKey: ['availableSlots', formattedDate],
+    queryFn: () => fetchAvailableSlots(formattedDate),
+    enabled: !!formattedDate
   });
   
   useEffect(() => {
@@ -104,7 +114,7 @@ const Schedule = () => {
     setProfessionalId(newProfessionalId);
   };
   
-  const handleGenerateSlots = (professionalId: string, dateRange: Date[], timeRange: TimeRange) => {
+  const handleGenerateSlots = () => {
     if (!professionalId || dateRange.length === 0) {
       toast.error('Por favor, selecione um profissional e um intervalo de datas.');
       return;
@@ -127,8 +137,7 @@ const Schedule = () => {
           professional_id: professionalId,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          is_available: true,
-          date: formattedDate
+          is_available: true
         });
       });
     });
@@ -137,9 +146,9 @@ const Schedule = () => {
   };
   
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
-    queryKey: ['appointments', { date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined }],
+    queryKey: ['appointments', { date: formattedDate }],
     queryFn: fetchAppointments,
-    enabled: !!selectedDate
+    enabled: !!formattedDate
   });
   
   const availableSlots = slots.filter(slot => slot.is_available);
@@ -165,8 +174,8 @@ const Schedule = () => {
                 onTimeRangeChange={handleTimeRangeChange}
                 onDateRangeChange={handleDateRangeChange}
                 onProfessionalChange={handleProfessionalChange}
-                onSubmit={() => handleGenerateSlots(professionalId, dateRange, timeRange)}
-                isLoading={createSlotsMutation.isLoading}
+                onSubmit={handleGenerateSlots}
+                isLoading={createSlotsMutation.isPending}
                 onClose={handleCloseDialog}
               />
             </DialogContent>
@@ -204,7 +213,7 @@ const Schedule = () => {
                     {availableSlots.map((slot) => (
                       <TableRow key={slot.id}>
                         <TableCell>
-                          {format(parse(slot.start_time, 'yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'', new Date()), 'HH:mm')}
+                          {format(new Date(slot.start_time), 'HH:mm')}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">Disponível</Badge>
@@ -214,7 +223,7 @@ const Schedule = () => {
                     {bookedSlots.map((appointment) => (
                       <TableRow key={appointment.id}>
                         <TableCell>
-                          {format(parse(appointment.slots?.start_time || '', 'yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'', new Date()), 'HH:mm')}
+                          {appointment.slots?.start_time && format(new Date(appointment.slots.start_time), 'HH:mm')}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary">Agendado</Badge>

@@ -26,6 +26,7 @@ export interface TimeSlot {
   start_time?: string;
   end_time?: string;
   professional_id?: string;
+  is_available?: boolean;
 }
 
 export interface Appointment {
@@ -39,6 +40,7 @@ export interface Appointment {
   status: 'confirmed' | 'cancelled' | 'completed';
   created_at: string;
   appointment_date: string;
+  updated_at?: string;
   professionals?: Professional;
   services?: Service;
   slots?: TimeSlot;
