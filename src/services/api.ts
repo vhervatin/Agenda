@@ -404,7 +404,7 @@ export const fetchAppointments = async (context: any) => {
         services:service_id (*),
         slots:slot_id (*)
       `)
-      .order('appointment_date', { ascending: false });
+      .order('created_at', { ascending: false });
     
     if (queryFilters) {
       const typedFilters = queryFilters as { status?: string; date?: string; professional_id?: string };
@@ -414,7 +414,9 @@ export const fetchAppointments = async (context: any) => {
       }
       
       if (typedFilters.date) {
-        query = query.eq('appointment_date', typedFilters.date);
+        // The appointment_date field should be compared with the date string
+        // We need to use like operator to match the date part of the timestamp
+        query = query.like('appointment_date', `${typedFilters.date}%`);
       }
       
       if (typedFilters.professional_id) {
@@ -425,6 +427,7 @@ export const fetchAppointments = async (context: any) => {
     const { data, error } = await query;
     
     if (error) throw error;
+    console.log('Fetched appointments:', data);
     return data;
   } catch (error) {
     console.error('Error fetching appointments:', error);

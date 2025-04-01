@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -25,7 +24,7 @@ const AppointmentsAdmin = () => {
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<'confirmed' | 'cancelled' | 'completed'>('confirmed');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   
   const filters = {
@@ -46,6 +45,9 @@ const AppointmentsAdmin = () => {
     queryKey: ['appointments', filters],
     queryFn: () => fetchAppointments({ queryKey: ['appointments', filters] })
   });
+  
+  console.log('Appointments data:', appointments);
+  console.log('Current filters:', filters);
   
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' | 'completed' }) => 
@@ -76,23 +78,29 @@ const AppointmentsAdmin = () => {
   };
   
   const filteredAppointments = appointments.filter(appointment => {
-    if (!appointment.slots?.start_time) return false;
+    if (!appointment.slots) return false;
     
-    const appointmentDate = new Date(appointment.slots.start_time);
+    if (selectedDate && appointment.appointment_date) {
+      const appointmentDate = new Date(appointment.appointment_date);
+      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+      const appointmentDateStr = format(appointmentDate, 'yyyy-MM-dd');
+      
+      if (appointmentDateStr !== selectedDateStr) {
+        return false;
+      }
+    }
     
-    const dateMatch = selectedDate 
-      ? appointmentDate.toDateString() === selectedDate.toDateString() 
-      : true;
+    if (filterStatus !== 'all' && appointment.status !== filterStatus) {
+      return false;
+    }
     
-    const statusMatch = filterStatus === 'all' || appointment.status === filterStatus;
-    
-    return dateMatch && statusMatch;
+    return true;
   });
   
   const appointmentsByDate = filteredAppointments.reduce((acc, appointment) => {
-    if (!appointment.slots?.start_time) return acc;
+    if (!appointment.appointment_date) return acc;
     
-    const dateStr = new Date(appointment.slots.start_time).toDateString();
+    const dateStr = new Date(appointment.appointment_date).toDateString();
     
     if (!acc[dateStr]) {
       acc[dateStr] = [];
