@@ -34,6 +34,10 @@ const AppointmentsAdmin = () => {
     status: filterStatus !== 'all' ? filterStatus : undefined
   };
   
+  useEffect(() => {
+    console.log('Current filters:', filters);
+  }, [filters]);
+  
   const { data: professionals = [] } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
@@ -43,14 +47,23 @@ const AppointmentsAdmin = () => {
   const { 
     data: appointments = [], 
     isLoading, 
+    error,
     refetch 
   } = useQuery({
     queryKey: ['appointments', filters],
     queryFn: () => fetchAppointments({ queryKey: ['appointments', filters] })
   });
   
-  console.log('Appointments data:', appointments);
-  console.log('Current filters:', filters);
+  useEffect(() => {
+    if (error) {
+      console.error('Error fetching appointments:', error);
+      toast.error('Erro ao carregar agendamentos. Tente novamente.');
+    }
+  }, [error]);
+  
+  useEffect(() => {
+    console.log('Appointments data:', appointments);
+  }, [appointments]);
   
   // Update appointment status mutation
   const updateStatusMutation = useMutation({
@@ -142,6 +155,18 @@ const AppointmentsAdmin = () => {
     return format(new Date(startTime), 'HH:mm');
   };
   
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    // Immediately refetch with the new date
+    setTimeout(() => refetch(), 100);
+  };
+  
+  const handleStatusChange = (status: string) => {
+    setFilterStatus(status);
+    // Immediately refetch with the new status
+    setTimeout(() => refetch(), 100);
+  };
+  
   return (
     <AdminLayout>
       <div className="p-6">
@@ -198,7 +223,7 @@ const AppointmentsAdmin = () => {
                     <Calendar
                       mode="single"
                       selected={selectedDate}
-                      onSelect={setSelectedDate}
+                      onSelect={handleDateSelect}
                       className="mx-auto"
                       locale={ptBR}
                     />
@@ -209,7 +234,7 @@ const AppointmentsAdmin = () => {
                   <Label htmlFor="filter-status">Status</Label>
                   <Select 
                     value={filterStatus} 
-                    onValueChange={setFilterStatus}
+                    onValueChange={handleStatusChange}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Status" />
@@ -229,6 +254,7 @@ const AppointmentsAdmin = () => {
                   onClick={() => {
                     setSelectedDate(undefined);
                     setFilterStatus('all');
+                    setTimeout(() => refetch(), 100);
                   }}
                 >
                   Limpar Filtros
@@ -257,6 +283,13 @@ const AppointmentsAdmin = () => {
             <CardContent>
               {isLoading ? (
                 <div className="text-center py-8">Carregando agendamentos...</div>
+              ) : error ? (
+                <div className="text-center py-8 text-destructive">
+                  Erro ao carregar agendamentos. 
+                  <Button variant="outline" onClick={() => refetch()} className="ml-2">
+                    Tentar novamente
+                  </Button>
+                </div>
               ) : sortedDates.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   Nenhum agendamento encontrado com os filtros selecionados.

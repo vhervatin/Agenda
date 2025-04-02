@@ -58,5 +58,10 @@ export const isRLSError = (error: any) => {
          errorMessage.includes('infinite recursion detected');
 };
 
+// Make query debugging easier in development
+supabase.on('query', (payload) => {
+  console.log('Supabase Query:', payload);
+});
+
 // Log client details to help with debugging
 console.log("Supabase client initialized with URL:", SUPABASE_URL);

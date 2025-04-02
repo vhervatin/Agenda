@@ -414,9 +414,13 @@ export const fetchAppointments = async (context: any) => {
       }
       
       if (typedFilters.date) {
-        // The appointment_date field should be compared with the date string
-        // We need to use like operator to match the date part of the timestamp
-        query = query.like('appointment_date', `${typedFilters.date}%`);
+        // Fix: Use a date range comparison instead of LIKE operator
+        const startOfDay = `${typedFilters.date}T00:00:00.000Z`;
+        const endOfDay = `${typedFilters.date}T23:59:59.999Z`;
+        
+        query = query
+          .gte('appointment_date', startOfDay)
+          .lte('appointment_date', endOfDay);
       }
       
       if (typedFilters.professional_id) {
@@ -426,7 +430,11 @@ export const fetchAppointments = async (context: any) => {
     
     const { data, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error in fetchAppointments:', error);
+      throw error;
+    }
+    
     console.log('Fetched appointments:', data);
     return data;
   } catch (error) {
