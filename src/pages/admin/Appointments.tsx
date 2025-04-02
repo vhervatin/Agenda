@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
-import { CheckCircle, XCircle, RotateCcw, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Clock, FilterX } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, parseISO, isToday, isAfter, isBefore } from 'date-fns';
@@ -27,18 +27,20 @@ const AppointmentsAdmin = () => {
   const [selectedStatus, setSelectedStatus] = useState<'confirmed' | 'cancelled' | 'completed'>('confirmed');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterProfessional, setFilterProfessional] = useState<string>('all');
   
   // Define the filters object for API query
   const filters = {
     date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
-    status: filterStatus !== 'all' ? filterStatus : undefined
+    status: filterStatus !== 'all' ? filterStatus : undefined,
+    professional_id: filterProfessional !== 'all' ? filterProfessional : undefined
   };
   
   useEffect(() => {
     console.log('Current filters:', filters);
   }, [filters]);
   
-  const { data: professionals = [] } = useQuery({
+  const { data: professionals = [], isLoading: isProfessionalsLoading } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
@@ -167,6 +169,19 @@ const AppointmentsAdmin = () => {
     setTimeout(() => refetch(), 100);
   };
   
+  const handleProfessionalChange = (professionalId: string) => {
+    setFilterProfessional(professionalId);
+    // Immediately refetch with the new professional filter
+    setTimeout(() => refetch(), 100);
+  };
+  
+  const resetFilters = () => {
+    setSelectedDate(undefined);
+    setFilterStatus('all');
+    setFilterProfessional('all');
+    setTimeout(() => refetch(), 100);
+  };
+  
   return (
     <AdminLayout>
       <div className="p-6">
@@ -211,7 +226,7 @@ const AppointmentsAdmin = () => {
         </div>
         
         <div className="grid md:grid-cols-[300px_1fr] gap-6">
-          <Card>
+          <Card className="h-fit">
             <CardHeader>
               <CardTitle>Filtros</CardTitle>
             </CardHeader>
@@ -228,6 +243,26 @@ const AppointmentsAdmin = () => {
                       locale={ptBR}
                     />
                   </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="filter-professional">Profissional</Label>
+                  <Select 
+                    value={filterProfessional} 
+                    onValueChange={handleProfessionalChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os profissionais" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os profissionais</SelectItem>
+                      {professionals.map((professional) => (
+                        <SelectItem key={professional.id} value={professional.id}>
+                          {professional.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
@@ -251,12 +286,9 @@ const AppointmentsAdmin = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => {
-                    setSelectedDate(undefined);
-                    setFilterStatus('all');
-                    setTimeout(() => refetch(), 100);
-                  }}
+                  onClick={resetFilters}
                 >
+                  <FilterX className="h-4 w-4 mr-2" />
                   Limpar Filtros
                 </Button>
               </div>
@@ -272,6 +304,9 @@ const AppointmentsAdmin = () => {
                     {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </span>
                 ) : 'Todos os agendamentos'}
+                {filterProfessional !== 'all' && (
+                  <span> - {professionals.find(p => p.id === filterProfessional)?.name || 'Profissional'}</span>
+                )}
                 {filterStatus !== 'all' && (
                   <span> - {
                     filterStatus === 'confirmed' ? 'Confirmados' : 
