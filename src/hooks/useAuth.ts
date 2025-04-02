@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
+type UserType = 'admin' | 'superadmin' | null;
+
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [userType, setUserType] = useState<'admin' | 'superadmin' | null>(null);
+  const [userType, setUserType] = useState<UserType>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -21,7 +23,7 @@ export const useAuth = () => {
 
       try {
         // First check from localStorage (for immediate response)
-        const storedUserType = localStorage.getItem('userType') as 'admin' | 'superadmin' | null;
+        const storedUserType = localStorage.getItem('userType') as UserType;
         
         // Also try to get from database
         const { data: userData, error } = await supabase
@@ -55,7 +57,7 @@ export const useAuth = () => {
             navigate('/superadmin/dashboard');
           }
         } else {
-          const tipo = userData?.tipo_usuario as 'admin' | 'superadmin' || 'admin';
+          const tipo = (userData?.tipo_usuario === 'admin' ? 'admin' : 'admin') as UserType;
           setUserType(tipo);
           localStorage.setItem('userType', tipo);
           

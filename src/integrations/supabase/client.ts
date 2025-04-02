@@ -58,10 +58,23 @@ export const isRLSError = (error: any) => {
          errorMessage.includes('infinite recursion detected');
 };
 
-// Make query debugging easier in development
-supabase.on('query', (payload) => {
-  console.log('Supabase Query:', payload);
-});
+// Debug function for logging queries
+// Note: The .on('query') method is not available in the current version
+// Instead, we'll use a simple wrapper function for debugging
+export const logQuery = (queryDescription: string, queryFunction: Function) => {
+  console.log(`Supabase Query: ${queryDescription} - Starting`);
+  
+  return async (...args: any[]) => {
+    try {
+      const result = await queryFunction(...args);
+      console.log(`Supabase Query: ${queryDescription} - Completed`, result);
+      return result;
+    } catch (error) {
+      console.error(`Supabase Query: ${queryDescription} - Error`, error);
+      throw error;
+    }
+  };
+};
 
 // Log client details to help with debugging
 console.log("Supabase client initialized with URL:", SUPABASE_URL);
