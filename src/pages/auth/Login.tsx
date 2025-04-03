@@ -121,11 +121,11 @@ const Login = () => {
                 </FormItem>
               )}
             />
-            <Button className="w-full" onClick={() => navigate("/")} type="button" variant="outline">
-              Voltar para o início
-            </Button>
             <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
               {loginMutation.isPending ? "Entrando..." : "Entrar"}
+            </Button>
+            <Button className="w-full" onClick={() => navigate("/")} type="button" variant="outline">
+              Voltar para o início
             </Button>
           </form>
         </Form>

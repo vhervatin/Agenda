@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,7 +29,6 @@ const AppointmentsAdmin = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterProfessional, setFilterProfessional] = useState<string>('all');
   
-  // Define the filters object for API query
   const filters = {
     date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
     status: filterStatus !== 'all' ? filterStatus : undefined,
@@ -46,7 +44,6 @@ const AppointmentsAdmin = () => {
     queryFn: fetchProfessionals
   });
   
-  // Fetch appointments with current filters
   const { 
     data: appointments = [], 
     isLoading, 
@@ -68,7 +65,6 @@ const AppointmentsAdmin = () => {
     console.log('Appointments data:', appointments);
   }, [appointments]);
   
-  // Update appointment status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' | 'completed' }) => 
       updateAppointmentStatus(id, status),
@@ -97,7 +93,6 @@ const AppointmentsAdmin = () => {
     setIsStatusDialogOpen(true);
   };
   
-  // Group appointments by date
   const appointmentsByDate = appointments.reduce((acc, appointment) => {
     if (!appointment.appointment_date) return acc;
     
@@ -111,17 +106,14 @@ const AppointmentsAdmin = () => {
     return acc;
   }, {} as Record<string, any[]>);
   
-  // Sort dates
   const sortedDates = Object.keys(appointmentsByDate).sort((a, b) => {
     return new Date(a).getTime() - new Date(b).getTime();
   });
   
-  // Calculate appointment counts by status
   const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
   const completedCount = appointments.filter(a => a.status === 'completed').length;
   const cancelledCount = appointments.filter(a => a.status === 'cancelled').length;
   
-  // Helper functions for UI
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -160,19 +152,16 @@ const AppointmentsAdmin = () => {
   
   const handleDateSelect = (date: Date | undefined) => {
     setSelectedDate(date);
-    // Immediately refetch with the new date
     setTimeout(() => refetch(), 100);
   };
   
   const handleStatusChange = (status: string) => {
     setFilterStatus(status);
-    // Immediately refetch with the new status
     setTimeout(() => refetch(), 100);
   };
   
   const handleProfessionalChange = (professionalId: string) => {
     setFilterProfessional(professionalId);
-    // Immediately refetch with the new professional filter
     setTimeout(() => refetch(), 100);
   };
   
