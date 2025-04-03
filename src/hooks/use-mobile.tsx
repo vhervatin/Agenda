@@ -18,11 +18,13 @@ export function useIsMobile() {
       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
     
-    window.addEventListener('resize', handleResize)
+    // Add event listener with passive: true for better performance
+    window.addEventListener('resize', handleResize, { passive: true })
     
     // Initialize on mount
     handleResize()
     
+    // Cleanup
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 

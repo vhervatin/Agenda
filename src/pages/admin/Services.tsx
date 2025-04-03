@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import { Pencil, Trash2, Plus, Scissors } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Professional, Service } from '@/types/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   fetchServices, 
   createService, 
@@ -25,6 +27,7 @@ import {
 } from '@/services/api';
 
 const Services = () => {
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -201,10 +204,10 @@ const Services = () => {
   return (
     <AdminLayout>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Gerenciar Serviços</h1>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Dialog open={isAssociateDialogOpen} onOpenChange={setIsAssociateDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
