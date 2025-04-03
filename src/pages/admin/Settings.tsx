@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -128,13 +129,13 @@ const Settings: React.FC<SettingsProps> = () => {
   
   return (
     <AdminLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Configurações da Empresa</h1>
+      <div className="p-4 md:p-6 overflow-x-hidden">
+        <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Configurações da Empresa</h1>
         
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="general">Geral</TabsTrigger>
-            <TabsTrigger value="customize" disabled={!companySettings}>
+          <TabsList className="w-full overflow-x-auto flex">
+            <TabsTrigger value="general" className="flex-1">Geral</TabsTrigger>
+            <TabsTrigger value="customize" disabled={!companySettings} className="flex-1">
               Personalização
               {!companySettings && (
                 <AlertTriangle className="ml-1 h-4 w-4" />
@@ -209,7 +210,7 @@ const Settings: React.FC<SettingsProps> = () => {
                         )}
                       />
                       
-                      <Button type="submit" disabled={submitting}>
+                      <Button type="submit" disabled={submitting} className="w-full md:w-auto">
                         {submitting
                           ? 'Salvando...'
                           : companySettings
@@ -273,7 +274,7 @@ const Settings: React.FC<SettingsProps> = () => {
                         )}
                       />
                       
-                      <Button type="submit" disabled={submitting}>
+                      <Button type="submit" disabled={submitting} className="w-full md:w-auto">
                         {submitting
                           ? 'Salvando...'
                           : companySettings

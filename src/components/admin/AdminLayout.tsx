@@ -154,7 +154,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   <span className="sr-only">Toggle navigation menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-[300px]">
+              <SheetContent side="left" className="p-0 w-[270px]">
                 {sidebarContent}
               </SheetContent>
             </Sheet>
@@ -162,14 +162,14 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <h1 className="text-lg font-semibold">Admin Dashboard</h1>
             </div>
           </div>
-          <div className="flex-1">{children}</div>
+          <div className="flex-1 overflow-x-hidden">{children}</div>
         </>
       ) : (
         <div className="flex min-h-screen">
-          <div className="w-[300px] border-r hidden md:block">
+          <div className="w-[270px] border-r hidden md:block">
             {sidebarContent}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 overflow-x-hidden">
             {children}
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
   fetchProfessionals,
   updateAppointmentStatus
 } from '@/services/api';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const AppointmentsAdmin = () => {
   const queryClient = useQueryClient();
@@ -184,15 +185,15 @@ const AppointmentsAdmin = () => {
   
   return (
     <AdminLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Agendamentos</h1>
+      <div className="p-4 md:p-6 overflow-x-hidden">
+        <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Agendamentos</h1>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
-            <CardContent className="p-6 flex items-center justify-between">
+            <CardContent className="p-4 md:p-6 flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Confirmados</p>
-                <p className="text-2xl font-bold">{confirmedCount}</p>
+                <p className="text-xl md:text-2xl font-bold">{confirmedCount}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                 <Clock className="h-4 w-4 text-blue-700" />
@@ -201,10 +202,10 @@ const AppointmentsAdmin = () => {
           </Card>
           
           <Card>
-            <CardContent className="p-6 flex items-center justify-between">
+            <CardContent className="p-4 md:p-6 flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Concluídos</p>
-                <p className="text-2xl font-bold">{completedCount}</p>
+                <p className="text-xl md:text-2xl font-bold">{completedCount}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCircle className="h-4 w-4 text-green-700" />
@@ -213,10 +214,10 @@ const AppointmentsAdmin = () => {
           </Card>
           
           <Card>
-            <CardContent className="p-6 flex items-center justify-between">
+            <CardContent className="p-4 md:p-6 flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Cancelados</p>
-                <p className="text-2xl font-bold">{cancelledCount}</p>
+                <p className="text-xl md:text-2xl font-bold">{cancelledCount}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
                 <XCircle className="h-4 w-4 text-red-700" />
@@ -225,7 +226,7 @@ const AppointmentsAdmin = () => {
           </Card>
         </div>
         
-        <div className="grid md:grid-cols-[300px_1fr] gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
           <Card className="h-fit">
             <CardHeader>
               <CardTitle>Filtros</CardTitle>
@@ -234,12 +235,12 @@ const AppointmentsAdmin = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Data</Label>
-                  <div className="border rounded-md p-2">
+                  <div className="border rounded-md p-0 sm:p-2 flex justify-center overflow-hidden">
                     <Calendar
                       mode="single"
                       selected={selectedDate}
                       onSelect={handleDateSelect}
-                      className="mx-auto"
+                      className="max-w-full"
                       locale={ptBR}
                     />
                   </div>
@@ -342,55 +343,61 @@ const AppointmentsAdmin = () => {
                         )}
                       </h3>
                       
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Horário</TableHead>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead>Telefone</TableHead>
-                            <TableHead>Profissional</TableHead>
-                            <TableHead>Serviço</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="w-[100px]">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {appointmentsByDate[dateStr].map((appointment) => (
-                            <TableRow key={appointment.id}>
-                              <TableCell>
-                                {appointment.slots && formatAppointmentTime(appointment.slots.start_time, appointment.slots.end_time)}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {appointment.client_name}
-                              </TableCell>
-                              <TableCell>{appointment.client_phone}</TableCell>
-                              <TableCell>{appointment.professionals?.name || '-'}</TableCell>
-                              <TableCell>{appointment.services?.name || '-'}</TableCell>
-                              <TableCell>
-                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
-                                  {getStatusIcon(appointment.status)}
-                                  <span className="ml-1">
-                                    {appointment.status === 'confirmed' ? 'Confirmado' : 
-                                     appointment.status === 'completed' ? 'Concluído' : 'Cancelado'}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => openStatusDialog(appointment, 
-                                    appointment.status as 'confirmed' | 'cancelled' | 'completed'
-                                  )}
-                                >
-                                  <RotateCcw className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                      <div className="overflow-x-auto">
+                        <ScrollArea className="w-full">
+                          <div className="min-w-max">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Horário</TableHead>
+                                  <TableHead>Cliente</TableHead>
+                                  <TableHead>Telefone</TableHead>
+                                  <TableHead>Profissional</TableHead>
+                                  <TableHead>Serviço</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead className="w-[100px]">Ações</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {appointmentsByDate[dateStr].map((appointment) => (
+                                  <TableRow key={appointment.id}>
+                                    <TableCell>
+                                      {appointment.slots && formatAppointmentTime(appointment.slots.start_time, appointment.slots.end_time)}
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      {appointment.client_name}
+                                    </TableCell>
+                                    <TableCell>{appointment.client_phone}</TableCell>
+                                    <TableCell>{appointment.professionals?.name || '-'}</TableCell>
+                                    <TableCell>{appointment.services?.name || '-'}</TableCell>
+                                    <TableCell>
+                                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
+                                        {getStatusIcon(appointment.status)}
+                                        <span className="ml-1">
+                                          {appointment.status === 'confirmed' ? 'Confirmado' : 
+                                           appointment.status === 'completed' ? 'Concluído' : 'Cancelado'}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => openStatusDialog(appointment, 
+                                          appointment.status as 'confirmed' | 'cancelled' | 'completed'
+                                        )}
+                                      >
+                                        <RotateCcw className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </ScrollArea>
+                      </div>
                     </div>
                   ))}
                 </div>
