@@ -157,7 +157,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
             mode="multiple"
             selected={selectedDates}
             onSelect={handleDateSelect}
-            className="mx-auto"
+            className="w-full max-w-full border-0"
           />
         </div>
       </div>

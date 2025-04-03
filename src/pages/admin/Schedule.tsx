@@ -191,15 +191,17 @@ const Schedule = () => {
         </div>
         
         <Card>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="w-full">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={handleDateSelect}
-                locale={ptBR}
-                className="rounded-md border"
-              />
+          <CardContent className="grid gap-6 md:grid-cols-2 p-4 md:p-6">
+            <div className="w-full flex justify-center">
+              <div className="w-full max-w-[300px] border rounded-md overflow-hidden">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  locale={ptBR}
+                  className="border-0"
+                />
+              </div>
             </div>
             
             <div>
