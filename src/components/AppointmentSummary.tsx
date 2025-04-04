@@ -43,6 +43,10 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
   };
 
   const allDetailsProvided = service && date && time && professionalName && clientName && clientPhone;
+  
+  // Check if duration and price are valid to display
+  const showDuration = service?.duration && service.duration !== '0' && service.duration !== '0 min' && service.duration !== '0h';
+  const showPrice = service?.price && service.price !== 'R$ 0,00' && service.price !== '0';
 
   return (
     <Card className="w-full animate-scale-in">
@@ -57,12 +61,16 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
           <div>
             <p className="text-sm text-muted-foreground">Serviço</p>
             <p className="font-medium">{service?.name || "Nenhum serviço selecionado"}</p>
-            {service && (
+            {service && (showDuration || showPrice) && (
               <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                <Clock className="h-3 w-3 mr-1" />
-                <span>{service.duration}</span>
-                <span className="mx-2">•</span>
-                <span>{service.price}</span>
+                {showDuration && (
+                  <>
+                    <Clock className="h-3 w-3 mr-1" />
+                    <span>{service.duration}</span>
+                  </>
+                )}
+                {showDuration && showPrice && <span className="mx-2">•</span>}
+                {showPrice && <span>{service.price}</span>}
               </div>
             )}
           </div>

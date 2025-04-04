@@ -34,7 +34,12 @@ const AppointmentSuccess = () => {
           setError('Agendamento não encontrado.');
         } else {
           console.log('Appointment loaded successfully:', data);
-          setAppointment(data);
+          // Make sure the status is always of the correct type expected by Appointment
+          const typedData = {
+            ...data,
+            status: data.status as 'confirmed' | 'cancelled' | 'completed'
+          };
+          setAppointment(typedData);
         }
       } catch (err: any) {
         console.error('Error loading appointment:', err);
@@ -68,6 +73,10 @@ const AppointmentSuccess = () => {
       minute: '2-digit'
     }).format(date);
   };
+  
+  // Check if price and duration should be displayed
+  const shouldShowPrice = appointment?.services?.price && appointment.services.price > 0;
+  const shouldShowDuration = appointment?.services?.duration && appointment.services.duration > 0;
   
   if (loading) {
     return (
@@ -173,9 +182,11 @@ const AppointmentSuccess = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Serviço</p>
                 <p className="font-medium">{appointment?.services?.name || 'Serviço não especificado'}</p>
-                {appointment?.services && (
+                {appointment?.services && (shouldShowDuration || shouldShowPrice) && (
                   <p className="text-sm text-muted-foreground">
-                    {appointment.services.duration} minutos • R$ {appointment.services.price.toFixed(2).replace('.', ',')}
+                    {shouldShowDuration && `${appointment.services.duration} minutos`}
+                    {shouldShowDuration && shouldShowPrice && ' • '}
+                    {shouldShowPrice && `R$ ${appointment.services.price.toFixed(2).replace('.', ',')}`}
                   </p>
                 )}
               </div>
