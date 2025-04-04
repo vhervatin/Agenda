@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, parse, addDays } from 'date-fns';
+import { format, parse, addDays, addMinutes } from 'date-fns';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -36,10 +36,6 @@ const generateTimeSlots = (startTime: string, endTime: string, interval: number)
   }
 
   return slots;
-};
-
-const addMinutes = (date: Date, minutes: number) => {
-  return new Date(date.getTime() + minutes * 60000);
 };
 
 const Schedule = () => {
@@ -174,7 +170,7 @@ const Schedule = () => {
             <DialogTrigger asChild>
               <Button onClick={handleOpenDialog}>Gerar Horários</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Gerar Horários Disponíveis</DialogTitle>
               </DialogHeader>

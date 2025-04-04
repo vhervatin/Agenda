@@ -1,219 +1,184 @@
+
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, ArrowLeft, Calendar, Clock, User, Clipboard } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { fetchAppointmentById } from '@/services/api';
-import { Appointment } from '@/types/types';
-import NavBar from '@/components/NavBar';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import NavBar from '@/components/NavBar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { fetchAppointmentById } from '@/services/api';
 
 const AppointmentSuccess = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const id = searchParams.get('id');
-  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const appointmentId = searchParams.get('id');
+  
+  const [appointment, setAppointment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    const loadAppointment = async () => {
+    if (appointmentId) {
       setLoading(true);
-      try {
-        const data = await fetchAppointmentById(id);
-        if (!data) {
+      fetchAppointmentById(appointmentId)
+        .then(data => {
+          setAppointment(data);
           setLoading(false);
-          setError('Agendamento não encontrado.');
-        } else {
-          console.log('Appointment loaded successfully:', data);
-          
-          const typedData = {
-            ...data,
-            status: data.status as 'confirmed' | 'cancelled' | 'completed',
-            slots: {
-              ...data.slots,
-              time: data.slots?.time || '',
-              available: data.slots?.is_available || false
-            }
-          };
-          
-          setAppointment(typedData as Appointment);
-        }
-      } catch (err: any) {
-        console.error('Error loading appointment:', err);
-        setLoading(false);
-        setError(`Erro ao carregar agendamento: ${err.message}`);
-      }
-    };
-
-    if (id) {
-      loadAppointment();
-    } else {
-      setLoading(false);
-      setError('ID do agendamento não fornecido.');
+        })
+        .catch(error => {
+          console.error("Error fetching appointment:", error);
+          toast.error("Não foi possível carregar os detalhes do agendamento");
+          setLoading(false);
+        });
     }
-  }, [id]);
+  }, [appointmentId]);
   
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Data não disponível';
+  const formatDuration = (minutes: number) => {
+    if (!minutes) return '';
     
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      weekday: 'long'
-    }).format(date);
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (remainingMinutes === 0) {
+      return `${hours}h`;
+    }
+    
+    return `${hours}h ${remainingMinutes}min`;
   };
   
-  const formatTime = (dateString?: string) => {
-    if (!dateString) return 'Horário não disponível';
-    
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+  const formatPrice = (price: number | undefined) => {
+    if (price === undefined || price === null || price === 0) {
+      return '';
+    }
+    return `R$ ${price.toFixed(2).replace('.', ',')}`;
   };
   
-  const shouldShowPrice = appointment?.services?.price && appointment.services.price > 0;
-  const shouldShowDuration = appointment?.services?.duration && appointment.services.duration > 0;
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  };
+  
+  const formatTime = (timeString: string) => {
+    if (!timeString) return '';
+    
+    const date = new Date(timeString);
+    return format(date, 'HH:mm');
+  };
+  
+  const handleBack = () => {
+    navigate('/');
+  };
+  
+  const handleViewAppointments = () => {
+    navigate('/appointments');
+  };
   
   if (loading) {
     return (
-      <>
+      <div className="min-h-screen flex flex-col">
         <NavBar />
-        <div className="container max-w-md mx-auto py-10 px-4">
-          <Skeleton className="h-8 w-3/4 mb-4" />
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-full mb-2" />
-              <Skeleton className="h-4 w-3/4" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-            </CardContent>
-            <CardFooter>
-              <Skeleton className="h-10 w-full" />
-            </CardFooter>
-          </Card>
-        </div>
-      </>
+        <main className="flex-1 container mx-auto px-4 py-12 flex justify-center items-center">
+          <div className="text-center">
+            <h2 className="text-lg">Carregando informações do agendamento...</h2>
+          </div>
+        </main>
+      </div>
     );
   }
   
-  if (error) {
+  if (!appointment) {
     return (
-      <>
+      <div className="min-h-screen flex flex-col">
         <NavBar />
-        <div className="container max-w-md mx-auto py-10 px-4">
-          <div className="text-center space-y-4">
-            <div className="rounded-full bg-red-100 p-3 w-12 h-12 mx-auto flex items-center justify-center">
-              <Clipboard className="h-6 w-6 text-red-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-red-600">{error}</h1>
-            <p className="text-muted-foreground">
-              Não conseguimos encontrar os detalhes do seu agendamento.
-            </p>
-            <Button asChild className="mt-4">
-              <Link to="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar para o início
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </>
+        <main className="flex-1 container mx-auto px-4 py-12 flex justify-center items-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Agendamento não encontrado</CardTitle>
+              <CardDescription>
+                Não foi possível encontrar os detalhes do agendamento.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="flex justify-center">
+              <Button onClick={handleBack}>Voltar para a página inicial</Button>
+            </CardFooter>
+          </Card>
+        </main>
+      </div>
     );
   }
   
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <NavBar />
-      <div className="container max-w-md mx-auto py-10 px-4">
-        <div className="text-center mb-6">
-          <div className="rounded-full bg-green-100 p-3 w-16 h-16 mx-auto flex items-center justify-center">
-            <CheckCircle className="h-8 w-8 text-green-600" />
-          </div>
-          <h1 className="text-2xl font-bold mt-4">Agendamento Confirmado!</h1>
-          <p className="text-muted-foreground">
-            Seu agendamento foi realizado com sucesso.
-          </p>
-        </div>
-        
-        <Card className="mb-6">
-          <CardHeader className="pb-2">
-            <h2 className="text-lg font-semibold">Detalhes do Agendamento</h2>
+      <main className="flex-1 container mx-auto px-4 py-12 flex justify-center items-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Agendamento confirmado!</CardTitle>
+            <CardDescription>
+              Seu agendamento foi realizado com sucesso.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full p-2 bg-primary/10">
-                <Calendar className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Data</p>
-                <p className="font-medium capitalize">
-                  {appointment?.appointment_date 
-                    ? formatDate(appointment.appointment_date) 
-                    : formatDate(appointment?.slots?.start_time)}
+            <div className="border-b pb-4">
+              <h3 className="font-semibold text-lg mb-2">Serviço</h3>
+              <p className="text-lg">{appointment.services?.name}</p>
+              {appointment.services?.duration ? (
+                <p className="text-sm text-muted-foreground">
+                  {formatDuration(appointment.services.duration)}
                 </p>
-              </div>
-            </div>
-            
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full p-2 bg-primary/10">
-                <Clock className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Horário</p>
-                <p className="font-medium">
-                  {appointment?.appointment_date 
-                    ? formatTime(appointment.appointment_date) 
-                    : formatTime(appointment?.slots?.start_time)}
+              ) : null}
+              {appointment.services?.price ? (
+                <p className="font-medium mt-1">
+                  {formatPrice(appointment.services.price)}
                 </p>
-              </div>
+              ) : null}
             </div>
             
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full p-2 bg-primary/10">
-                <Clipboard className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Serviço</p>
-                <p className="font-medium">{appointment?.services?.name || 'Serviço não especificado'}</p>
-                {appointment?.services && (shouldShowDuration || shouldShowPrice) && (
-                  <p className="text-sm text-muted-foreground">
-                    {shouldShowDuration && `${appointment.services.duration} minutos`}
-                    {shouldShowDuration && shouldShowPrice && ' • '}
-                    {shouldShowPrice && `R$ ${appointment.services.price.toFixed(2).replace('.', ',')}`}
-                  </p>
-                )}
-              </div>
+            <div className="border-b pb-4">
+              <h3 className="font-semibold text-lg mb-2">Data e horário</h3>
+              <p>{formatDate(appointment.appointment_date)}</p>
+              <p className="font-medium">
+                {appointment.slots?.start_time && formatTime(appointment.slots.start_time)}
+              </p>
             </div>
             
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full p-2 bg-primary/10">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Profissional</p>
-                <p className="font-medium">{appointment?.professionals?.name || 'Profissional não especificado'}</p>
-              </div>
+            <div className="border-b pb-4">
+              <h3 className="font-semibold text-lg mb-2">Profissional</h3>
+              <p>{appointment.professionals?.name}</p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Seus dados</h3>
+              <p>{appointment.client_name}</p>
+              <p className="text-sm text-muted-foreground">{appointment.client_phone}</p>
+              <p className="text-sm text-muted-foreground">{appointment.client_cpf}</p>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button asChild className="w-full">
-              <Link to="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar para o início
-              </Link>
+          <CardFooter className="flex flex-col space-y-2">
+            <Button 
+              className="w-full" 
+              variant="default" 
+              onClick={handleViewAppointments}
+            >
+              Ver meus agendamentos
+            </Button>
+            <Button 
+              className="w-full" 
+              variant="outline" 
+              onClick={handleBack}
+            >
+              Voltar para a página inicial
             </Button>
           </CardFooter>
         </Card>
-      </div>
-    </>
+      </main>
+    </div>
   );
 };
 

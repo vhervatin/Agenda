@@ -1,4 +1,3 @@
-
 export interface Service {
   id: string;
   name: string;
@@ -51,6 +50,12 @@ export interface TimeRange {
   startMinute: string;
   endHour: string;
   endMinute: string;
+}
+
+export interface DateRangeOptions {
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  selectedDays: number[]; // 0 = Sunday, 1 = Monday, etc.
 }
 
 export interface WebhookConfiguration {

@@ -8,6 +8,7 @@ export interface TimeSlot {
   time: string;
   available: boolean;
   start_time?: string;
+  end_time?: string;
 }
 
 interface TimeSlotsProps {

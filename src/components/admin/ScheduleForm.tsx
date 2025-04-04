@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm, FormProvider } from "react-hook-form"
 import * as z from "zod"
 import { useQuery } from '@tanstack/react-query';
+import { addDays, format, isAfter, isBefore, isWithinInterval } from 'date-fns';
 
 import { Button } from "@/components/ui/button"
 import {
@@ -19,9 +20,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { TimeRange } from '@/types/types';
+import { TimeRange, DateRangeOptions } from '@/types/types';
 import { fetchProfessionals } from '@/services/api';
 import { Calendar } from '@/components/ui/calendar';
+import { Checkbox } from "@/components/ui/checkbox";
 
 const timeRangeSchema = z.object({
   startHour: z.string().min(1, {
@@ -47,6 +49,16 @@ interface ScheduleFormProps {
   onClose: () => void;
 }
 
+const DAYS_OF_WEEK = [
+  { value: 0, label: 'Domingo' },
+  { value: 1, label: 'Segunda' },
+  { value: 2, label: 'Terça' },
+  { value: 3, label: 'Quarta' },
+  { value: 4, label: 'Quinta' },
+  { value: 5, label: 'Sexta' },
+  { value: 6, label: 'Sábado' },
+];
+
 const ScheduleForm: React.FC<ScheduleFormProps> = ({
   onTimeRangeChange,
   onDateRangeChange,
@@ -57,7 +69,11 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
 }) => {
   const [timeRanges, setTimeRanges] = useState<TimeRange[]>([]);
   const [selectedProfessional, setSelectedProfessional] = useState<string | undefined>(undefined);
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [dateRange, setDateRange] = useState<DateRangeOptions>({
+    startDate: undefined,
+    endDate: undefined,
+    selectedDays: [1, 2, 3, 4, 5] // Default to weekdays
+  });
 
   // Fetch professionals data
   const { data: professionals = [] } = useQuery({
@@ -70,7 +86,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
     defaultValues: {
       startHour: "09",
       startMinute: "00",
-      endHour: "10",
+      endHour: "17",
       endMinute: "00",
     },
   });
@@ -100,11 +116,51 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
     setTimeRanges(newTimeRanges);
   };
 
-  const handleDateSelect = (dates: Date[] | undefined) => {
-    if (dates) {
-      setSelectedDates(dates);
-      onDateRangeChange(dates);
+  const handleDateRangeChange = (field: 'startDate' | 'endDate', value: Date | undefined) => {
+    setDateRange(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Generate dates to pass to parent component
+    generateDatesToParent({ ...dateRange, [field]: value });
+  };
+
+  const handleDayToggle = (day: number) => {
+    setDateRange(prev => {
+      const newSelectedDays = prev.selectedDays.includes(day)
+        ? prev.selectedDays.filter(d => d !== day)
+        : [...prev.selectedDays, day];
+      
+      // Generate dates to pass to parent component
+      const newDateRange = {
+        ...prev,
+        selectedDays: newSelectedDays
+      };
+      
+      generateDatesToParent(newDateRange);
+      
+      return newDateRange;
+    });
+  };
+
+  const generateDatesToParent = (options: DateRangeOptions) => {
+    const { startDate, endDate, selectedDays } = options;
+    
+    if (!startDate || !endDate) return;
+    
+    const dates: Date[] = [];
+    let currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dayOfWeek = currentDate.getDay();
+      if (selectedDays.includes(dayOfWeek)) {
+        dates.push(new Date(currentDate));
+      }
+      currentDate = addDays(currentDate, 1);
     }
+    
+    onDateRangeChange(dates);
   };
 
   const handleProfessionalChange = (value: string) => {
@@ -118,8 +174,13 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
       return;
     }
     
-    if (selectedDates.length === 0) {
-      toast.error("Selecione pelo menos uma data.");
+    if (!dateRange.startDate || !dateRange.endDate) {
+      toast.error("Selecione o período de datas.");
+      return;
+    }
+    
+    if (dateRange.selectedDays.length === 0) {
+      toast.error("Selecione pelo menos um dia da semana.");
       return;
     }
     
@@ -150,15 +211,54 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
         </Select>
       </div>
       
+      <div className="space-y-4">
+        <Label className="text-base">Período</Label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Data inicial</Label>
+            <div className="border rounded-md">
+              <Calendar
+                mode="single"
+                selected={dateRange.startDate}
+                onSelect={(date) => handleDateRangeChange('startDate', date)}
+                className="w-full max-w-full border-0"
+                disabled={(date) => dateRange.endDate ? isAfter(date as Date, dateRange.endDate) : false}
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Data final</Label>
+            <div className="border rounded-md">
+              <Calendar
+                mode="single"
+                selected={dateRange.endDate}
+                onSelect={(date) => handleDateRangeChange('endDate', date)}
+                className="w-full max-w-full border-0"
+                disabled={(date) => dateRange.startDate ? isBefore(date as Date, dateRange.startDate) : false}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div>
-        <Label className="text-base">Datas</Label>
-        <div className="border rounded-md p-2">
-          <Calendar
-            mode="multiple"
-            selected={selectedDates}
-            onSelect={handleDateSelect}
-            className="w-full max-w-full border-0"
-          />
+        <Label className="text-base mb-2 block">Dias da semana</Label>
+        <div className="grid grid-cols-4 gap-2">
+          {DAYS_OF_WEEK.map((day) => (
+            <div key={day.value} className="flex items-center space-x-2">
+              <Checkbox 
+                id={`day-${day.value}`} 
+                checked={dateRange.selectedDays.includes(day.value)}
+                onCheckedChange={() => handleDayToggle(day.value)}
+              />
+              <label
+                htmlFor={`day-${day.value}`}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                {day.label}
+              </label>
+            </div>
+          ))}
         </div>
       </div>
       
