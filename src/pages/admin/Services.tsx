@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -119,23 +118,23 @@ const Services = () => {
   };
   
   const handleCreateService = () => {
-    if (!name.trim() || !duration || !price) {
-      toast.error('Nome, duração e preço são obrigatórios');
+    if (!name.trim()) {
+      toast.error('Nome é obrigatório');
       return;
     }
     
     createMutation.mutate({
       name,
       description,
-      duration: parseInt(duration),
-      price: parseFloat(price),
+      duration: duration ? parseInt(duration) : 0,
+      price: price ? parseFloat(price) : 0,
       active: true
     });
   };
   
   const handleUpdateService = () => {
-    if (!selectedService || !name.trim() || !duration || !price) {
-      toast.error('Nome, duração e preço são obrigatórios');
+    if (!selectedService || !name.trim()) {
+      toast.error('Nome é obrigatório');
       return;
     }
     
@@ -144,8 +143,8 @@ const Services = () => {
       data: {
         name,
         description,
-        duration: parseInt(duration),
-        price: parseFloat(price)
+        duration: duration ? parseInt(duration) : 0,
+        price: price ? parseFloat(price) : 0
       }
     });
   };
@@ -307,7 +306,7 @@ const Services = () => {
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="duration">Duração (minutos)*</Label>
+                      <Label htmlFor="duration">Duração (minutos)</Label>
                       <Input 
                         id="duration" 
                         type="number" 
@@ -319,7 +318,7 @@ const Services = () => {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="price">Preço (R$)*</Label>
+                      <Label htmlFor="price">Preço (R$)</Label>
                       <Input 
                         id="price" 
                         type="number" 
@@ -439,7 +438,7 @@ const Services = () => {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-duration">Duração (minutos)*</Label>
+                <Label htmlFor="edit-duration">Duração (minutos)</Label>
                 <Input 
                   id="edit-duration" 
                   type="number" 
@@ -451,7 +450,7 @@ const Services = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="edit-price">Preço (R$)*</Label>
+                <Label htmlFor="edit-price">Preço (R$)</Label>
                 <Input 
                   id="edit-price" 
                   type="number" 
