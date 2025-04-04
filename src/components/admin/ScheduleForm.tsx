@@ -24,6 +24,7 @@ import { TimeRange, DateRangeOptions } from '@/types/types';
 import { fetchProfessionals } from '@/services/api';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
 
 const timeRangeSchema = z.object({
   startHour: z.string().min(1, {
@@ -38,12 +39,14 @@ const timeRangeSchema = z.object({
   endMinute: z.string().min(1, {
     message: "Selecione o minuto de término.",
   }),
+  slotDuration: z.number().min(5).max(180)
 })
 
 interface ScheduleFormProps {
   onTimeRangeChange: (timeRange: TimeRange) => void;
   onDateRangeChange: (dateRange: Date[]) => void;
   onProfessionalChange: (professionalId: string) => void;
+  onSlotDurationChange?: (duration: number) => void;
   onSubmit: () => void;
   isLoading: boolean;
   onClose: () => void;
@@ -63,6 +66,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
   onTimeRangeChange,
   onDateRangeChange,
   onProfessionalChange,
+  onSlotDurationChange,
   onSubmit,
   isLoading,
   onClose
@@ -74,6 +78,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
     endDate: undefined,
     selectedDays: [1, 2, 3, 4, 5] // Default to weekdays
   });
+  const [slotDuration, setSlotDuration] = useState(30); // Default 30 minutes
 
   // Fetch professionals data
   const { data: professionals = [] } = useQuery({
@@ -88,6 +93,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
       startMinute: "00",
       endHour: "17",
       endMinute: "00",
+      slotDuration: 30,
     },
   });
 
@@ -106,8 +112,13 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
       startHour: values.startHour,
       startMinute: values.startMinute,
       endHour: values.endHour,
-      endMinute: values.endMinute
+      endMinute: values.endMinute,
+      slotDuration: values.slotDuration
     });
+    
+    if (onSlotDurationChange) {
+      onSlotDurationChange(values.slotDuration);
+    }
   };
 
   const removeTimeRange = (index: number) => {
@@ -166,6 +177,16 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
   const handleProfessionalChange = (value: string) => {
     setSelectedProfessional(value);
     onProfessionalChange(value);
+  };
+
+  const handleSlotDurationChange = (value: number[]) => {
+    const duration = value[0];
+    setSlotDuration(duration);
+    form.setValue("slotDuration", duration);
+    
+    if (onSlotDurationChange) {
+      onSlotDurationChange(duration);
+    }
   };
 
   const handleSubmitForm = () => {
@@ -368,6 +389,31 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
                 )}
               />
             </div>
+            
+            <FormField
+              control={form.control}
+              name="slotDuration"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duração de cada vaga (minutos): {slotDuration}</FormLabel>
+                  <FormControl>
+                    <Slider
+                      defaultValue={[30]}
+                      max={180}
+                      min={5}
+                      step={5}
+                      value={[field.value]}
+                      onValueChange={handleSlotDurationChange}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Defina a duração de cada vaga entre 5 e 180 minutos
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Button type="button" onClick={() => addTimeRange(form.getValues())}>Adicionar Horário</Button>
 
             {timeRanges.length > 0 && (

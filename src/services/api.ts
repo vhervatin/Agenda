@@ -349,6 +349,41 @@ export const createAvailableSlotsBulk = async (slots: any[]) => {
   }
 };
 
+export const deleteAvailableSlot = async (slotId: string) => {
+  try {
+    const { error } = await supabase
+      .from('available_slots')
+      .delete()
+      .eq('id', slotId);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting slot:', error);
+    throw error;
+  }
+};
+
+export const deleteAvailableSlotsByDate = async (date: string) => {
+  try {
+    const startOfDay = `${date}T00:00:00.000Z`;
+    const endOfDay = `${date}T23:59:59.999Z`;
+    
+    const { error } = await supabase
+      .from('available_slots')
+      .delete()
+      .gte('start_time', startOfDay)
+      .lte('start_time', endOfDay)
+      .eq('is_available', true); // Only delete available slots
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting slots by date:', error);
+    throw error;
+  }
+};
+
 // Appointment related functions
 export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at'>) => {
   try {

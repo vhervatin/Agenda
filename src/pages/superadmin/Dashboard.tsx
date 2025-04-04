@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -22,7 +23,7 @@ const Dashboard = () => {
           return;
         }
         
-        if (userData.role !== 'superadmin') {
+        if (userData.tipo_usuario !== 'superadmin') {
           toast.error("Acesso não autorizado");
           navigate('/admin/dashboard');
           return;

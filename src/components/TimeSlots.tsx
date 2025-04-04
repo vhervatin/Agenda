@@ -59,13 +59,16 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
             onClick={() => slot.available && onSelectTimeSlot(slot.id)}
             disabled={!slot.available}
             className={cn(
-              "time-slot",
-              selectedSlot === slot.id && "time-slot-selected",
+              "time-slot flex items-center justify-center p-2 border rounded-md hover:bg-primary/10 hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20",
+              selectedSlot === slot.id && "bg-primary text-primary-foreground hover:bg-primary hover:border-primary",
               !slot.available && "opacity-40 cursor-not-allowed bg-muted hover:bg-muted hover:border-border"
             )}
           >
             <div className="flex items-center justify-center">
-              <Clock className="h-3 w-3 mr-2 text-muted-foreground" />
+              <Clock className={cn(
+                "h-3 w-3 mr-2",
+                selectedSlot === slot.id ? "text-primary-foreground" : "text-muted-foreground"
+              )} />
               <span className="text-sm font-medium">{slot.time}</span>
             </div>
           </button>
