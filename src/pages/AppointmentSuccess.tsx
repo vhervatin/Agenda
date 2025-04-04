@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, ArrowLeft, Calendar, Clock, User, Clipboard } from 'lucide-react';
@@ -19,37 +18,40 @@ const AppointmentSuccess = () => {
   
   useEffect(() => {
     const loadAppointment = async () => {
+      setLoading(true);
       try {
-        if (!id) {
-          setError('ID do agendamento não encontrado.');
-          setLoading(false);
-          return;
-        }
-        
-        console.log('Fetching appointment with ID:', id);
         const data = await fetchAppointmentById(id);
-        
         if (!data) {
-          console.error('No appointment found with ID:', id);
+          setLoading(false);
           setError('Agendamento não encontrado.');
         } else {
           console.log('Appointment loaded successfully:', data);
-          // Make sure the status is always of the correct type expected by Appointment
+          
           const typedData = {
             ...data,
-            status: data.status as 'confirmed' | 'cancelled' | 'completed'
+            status: data.status as 'confirmed' | 'cancelled' | 'completed',
+            slots: {
+              ...data.slots,
+              time: data.slots?.time || '',
+              available: data.slots?.is_available || false
+            }
           };
-          setAppointment(typedData);
+          
+          setAppointment(typedData as Appointment);
         }
       } catch (err: any) {
         console.error('Error loading appointment:', err);
-        setError(err.message || 'Erro ao carregar detalhes do agendamento.');
-      } finally {
         setLoading(false);
+        setError(`Erro ao carregar agendamento: ${err.message}`);
       }
     };
-    
-    loadAppointment();
+
+    if (id) {
+      loadAppointment();
+    } else {
+      setLoading(false);
+      setError('ID do agendamento não fornecido.');
+    }
   }, [id]);
   
   const formatDate = (dateString?: string) => {
@@ -74,7 +76,6 @@ const AppointmentSuccess = () => {
     }).format(date);
   };
   
-  // Check if price and duration should be displayed
   const shouldShowPrice = appointment?.services?.price && appointment.services.price > 0;
   const shouldShowDuration = appointment?.services?.duration && appointment.services.duration > 0;
   

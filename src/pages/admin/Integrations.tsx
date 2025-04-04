@@ -22,6 +22,7 @@ import {
 } from '@/services/api';
 import { WebhookConfiguration as WebhookConfig } from '@/types/types';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 const Integrations = () => {
   const queryClient = useQueryClient();
@@ -34,7 +35,8 @@ const Integrations = () => {
   const [testEventType, setTestEventType] = useState('appointment_created');
   const [isTesting, setIsTesting] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
-  
+  const navigate = useNavigate();
+
   const { data: webhookConfigurations = [], isLoading: isLoadingConfigurations } = useQuery({
     queryKey: ['webhook-configurations'],
     queryFn: fetchWebhookConfigurations
@@ -169,6 +171,11 @@ const Integrations = () => {
     return option ? option.label : value;
   };
   
+  const handleAdicionarSuccess = () => {
+    toast.success('Webhook adicionado com sucesso!');
+    navigate('/admin/integrations');
+  };
+
   return (
     <AdminLayout>
       <div className="p-6">

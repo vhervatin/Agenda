@@ -22,6 +22,10 @@ const ServiceItem: React.FC<ServiceItemProps> = ({
   selected,
   onSelect,
 }) => {
+  // Verificar se a duração e o preço devem ser exibidos
+  const showDuration = duration && duration !== '0' && duration !== '0 min' && duration !== '0h';
+  const showPrice = price && price !== 'R$ 0,00' && price !== '0' && price !== 'Preço indisponível';
+
   return (
     <div
       className={cn(
@@ -41,12 +45,14 @@ const ServiceItem: React.FC<ServiceItemProps> = ({
       <div className="flex flex-col space-y-3">
         <div className="flex justify-between items-start">
           <div>
-            <span className="inline-block px-2 py-1 mb-2 text-xs font-medium rounded-full bg-secondary text-secondary-foreground">
-              {duration}
-            </span>
+            {showDuration && (
+              <span className="inline-block px-2 py-1 mb-2 text-xs font-medium rounded-full bg-secondary text-secondary-foreground">
+                {duration}
+              </span>
+            )}
             <h3 className="text-lg font-medium">{name}</h3>
           </div>
-          <span className="text-lg font-semibold">{price}</span>
+          {showPrice && <span className="text-lg font-semibold">{price}</span>}
         </div>
         
         <p className="text-sm text-muted-foreground">{description}</p>

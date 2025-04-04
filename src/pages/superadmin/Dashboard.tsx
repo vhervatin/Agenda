@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,11 +9,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/types';
 import { Company } from '@/types/webhook';
 
-// Create a layout component for SuperAdmin
 const SuperAdminLayout: React.FC<{ children: React.ReactNode, title?: string }> = ({ children, title }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
   useEffect(() => {
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
@@ -45,7 +44,6 @@ const SuperAdminLayout: React.FC<{ children: React.ReactNode, title?: string }> 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
-        {/* Sidebar */}
         <div className="hidden md:flex w-64 flex-col fixed h-screen bg-gray-900">
           <div className="flex items-center justify-center h-16 bg-gray-800">
             <h1 className="text-white text-xl font-bold">SuperAdmin</h1>
@@ -86,12 +84,10 @@ const SuperAdminLayout: React.FC<{ children: React.ReactNode, title?: string }> 
           </div>
         </div>
         
-        {/* Mobile header */}
         <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-white border-b shadow-sm h-16 flex items-center px-4">
           <h1 className="text-xl font-bold">SuperAdmin</h1>
         </div>
         
-        {/* Main content */}
         <div className="md:ml-64 flex-1 p-6 md:p-8 md:pt-6 mt-16 md:mt-0">
           {title && <h1 className="text-2xl font-bold mb-6">{title}</h1>}
           {children}
@@ -101,22 +97,27 @@ const SuperAdminLayout: React.FC<{ children: React.ReactNode, title?: string }> 
   );
 };
 
-// SuperAdmin Dashboard Component
 const SuperAdminDashboard = () => {
-  // Fetch companies
-  const { data: companies = [] } = useQuery({
+  const { data: companyData, isLoading: isLoadingCompany } = useQuery({
     queryKey: ['companies'],
     queryFn: fetchCompanies
   });
-  
-  // Calculate statistics
-  const activeCompanies = companies.filter(company => company.is_active).length;
-  const totalCompanies = companies.length;
-  const expiredCompanies = companies.filter(company => {
+
+  const handleUserSelect = (userData: any) => {
+    const typedUserData: User = {
+      ...userData,
+      tipo_usuario: userData.tipo_usuario as 'admin' | 'superadmin'
+    };
+    setSelectedUser(typedUserData);
+  };
+
+  const activeCompanies = companyData.filter(company => company.is_active).length;
+  const totalCompanies = companyData.length;
+  const expiredCompanies = companyData.filter(company => {
     if (!company.plan_expiry_date) return false;
     return new Date(company.plan_expiry_date) < new Date();
   }).length;
-  
+
   return (
     <SuperAdminLayout title="Dashboard">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -172,13 +173,13 @@ const SuperAdminDashboard = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            {companies.length === 0 ? (
+            {companyData.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
                 Nenhuma empresa cadastrada
               </div>
             ) : (
               <div className="space-y-4">
-                {companies.slice(0, 5).map((company) => (
+                {companyData.slice(0, 5).map((company) => (
                   <div key={company.id} className="flex items-center justify-between border-b pb-3">
                     <div className="flex items-center space-x-3">
                       <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center">
@@ -209,7 +210,7 @@ const SuperAdminDashboard = () => {
               </div>
             )}
             
-            {companies.length > 5 && (
+            {companyData.length > 5 && (
               <div className="pt-4 text-center">
                 <Button variant="outline" asChild>
                   <Link to="/superadmin/companies">Ver todas</Link>
@@ -226,9 +227,8 @@ const SuperAdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Calculate revenue by plan */}
               {['basic', 'premium', 'enterprise'].map(plan => {
-                const planCompanies = companies.filter(c => c.plan === plan && c.is_active);
+                const planCompanies = companyData.filter(c => c.plan === plan && c.is_active);
                 const planRevenue = planCompanies.reduce((sum, company) => sum + (company.plan_value || 0), 0);
                 const planCount = planCompanies.length;
                 
@@ -248,7 +248,7 @@ const SuperAdminDashboard = () => {
               <div className="flex justify-between items-center pt-2">
                 <p className="font-semibold">Total Mensal</p>
                 <p className="font-bold text-lg">
-                  R$ {companies
+                  R$ {companyData
                     .filter(c => c.is_active)
                     .reduce((sum, company) => sum + (company.plan_value || 0), 0)
                     .toFixed(2)
