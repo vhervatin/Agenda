@@ -25,6 +25,8 @@ interface Slot {
   start_time: string;
   end_time: string;
   is_available: boolean;
+  convenio_id?: string | null;
+  convenio_nome?: string;
 }
 
 const generateTimeSlots = (startTime: string, endTime: string, interval: number) => {
@@ -57,6 +59,7 @@ const Schedule = () => {
     endHour: '18',
     endMinute: '00',
   });
+  const [selectedConvenioId, setSelectedConvenioId] = useState<string | null>(null);
   
   // Get the date string for the API
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
@@ -78,9 +81,11 @@ const Schedule = () => {
       // Converta TimeSlot[] para Slot[]
       const convertedSlots: Slot[] = availableSlotsData.map(slot => ({
         id: slot.id,
-        start_time: slot.start_time,
-        end_time: slot.end_time,
-        is_available: slot.is_available || false
+        start_time: slot.start_time || '',
+        end_time: slot.end_time || '',
+        is_available: slot.is_available || false,
+        convenio_id: slot.convenio_id,
+        convenio_nome: slot.convenio_nome
       }));
       setSlots(convertedSlots);
     }
@@ -145,6 +150,10 @@ const Schedule = () => {
     setProfessionalId(newProfessionalId);
   };
 
+  const handleConvenioChange = (newConvenioId: string | null) => {
+    setSelectedConvenioId(newConvenioId);
+  };
+
   const handleSlotDurationChange = (duration: number) => {
     setSlotDuration(duration);
   };
@@ -187,7 +196,8 @@ const Schedule = () => {
           professional_id: professionalId,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          is_available: true
+          is_available: true,
+          convenio_id: selectedConvenioId
         });
       });
     });
@@ -227,6 +237,7 @@ const Schedule = () => {
                 onDateRangeChange={handleDateRangeChange}
                 onProfessionalChange={handleProfessionalChange}
                 onSlotDurationChange={handleSlotDurationChange}
+                onConvenioChange={handleConvenioChange}
                 onSubmit={handleGenerateSlots}
                 isLoading={createSlotsMutation.isPending}
                 onClose={handleCloseDialog}
@@ -285,6 +296,7 @@ const Schedule = () => {
                         <TableRow>
                           <TableHead>Horário</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Convênio</TableHead>
                           <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -296,6 +308,9 @@ const Schedule = () => {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">Disponível</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {slot.convenio_nome || 'Sem convênio'}
                             </TableCell>
                             <TableCell className="text-right">
                               <Button 
@@ -316,6 +331,10 @@ const Schedule = () => {
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary">Agendado</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {/* Convenio info not available in appointments */}
+                              -
                             </TableCell>
                             <TableCell className="text-right">
                               {/* Ações indisponíveis para slots agendados */}

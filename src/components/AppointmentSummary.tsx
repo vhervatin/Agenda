@@ -1,24 +1,28 @@
 
 import React from 'react';
-import { CalendarDays, Clock, ClipboardList, User, Phone, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Check, Clock, Calendar } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface AppointmentSummaryProps {
   service: {
     name: string;
     duration: string;
     price: string;
-  } | null;
+  };
   date: Date | null;
   time: string | null;
-  professionalName?: string;
-  clientName?: string;
-  clientPhone?: string;
-  clientCpf?: string;
+  professionalName: string;
+  clientName: string;
+  clientPhone: string;
+  clientCpf: string;
+  convenio?: string;
   onConfirm: () => void;
   onEdit: () => void;
-  isSubmitting?: boolean;
+  isSubmitting: boolean;
 }
 
 const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
@@ -29,115 +33,107 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
   clientName,
   clientPhone,
   clientCpf,
+  convenio,
   onConfirm,
   onEdit,
-  isSubmitting = false
+  isSubmitting
 }) => {
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('pt-BR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(date);
+  const formatCpf = (cpf: string) => {
+    const cleanCpf = cpf.replace(/\D/g, '');
+    return cleanCpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
-
-  const allDetailsProvided = service && date && time && professionalName && clientName && clientPhone;
   
-  // Check if duration and price are valid to display
-  const showDuration = service?.duration && service.duration !== '0' && service.duration !== '0 min' && service.duration !== '0h';
-  const showPrice = service?.price && service.price !== 'R$ 0,00' && service.price !== '0';
-
+  const formatPhone = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    
+    if (cleanPhone.length === 11) {
+      return cleanPhone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+    
+    return cleanPhone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  };
+  
   return (
-    <Card className="w-full animate-scale-in">
-      <CardHeader>
-        <CardTitle className="text-xl">Resumo do Agendamento</CardTitle>
+    <Card className="animate-fade-in">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center text-xl">
+          <Check className="mr-2 h-5 w-5 text-primary" />
+          Confirmar Agendamento
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-start space-x-3">
-          <div className="rounded-full p-2 bg-primary/10">
-            <ClipboardList className="h-4 w-4 text-primary" />
-          </div>
+      <CardContent>
+        <div className="space-y-6">
           <div>
-            <p className="text-sm text-muted-foreground">Serviço</p>
-            <p className="font-medium">{service?.name || "Nenhum serviço selecionado"}</p>
-            {service && (showDuration || showPrice) && (
-              <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                {showDuration && (
-                  <>
-                    <Clock className="h-3 w-3 mr-1" />
-                    <span>{service.duration}</span>
-                  </>
-                )}
-                {showDuration && showPrice && <span className="mx-2">•</span>}
-                {showPrice && <span>{service.price}</span>}
+            <h3 className="text-lg font-semibold">Serviço</h3>
+            <p className="text-muted-foreground">{service.name}</p>
+            <div className="flex flex-wrap gap-x-4 mt-1">
+              <span className="text-sm">{service.duration}</span>
+              <span className="text-sm">{service.price}</span>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          <div>
+            <h3 className="text-lg font-semibold">Profissional</h3>
+            <p className="text-muted-foreground">{professionalName}</p>
+          </div>
+          
+          {convenio && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="text-lg font-semibold">Convênio</h3>
+                <p className="text-muted-foreground">{convenio}</p>
               </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="flex items-start space-x-3">
-          <div className="rounded-full p-2 bg-primary/10">
-            <CalendarDays className="h-4 w-4 text-primary" />
-          </div>
+            </>
+          )}
+          
+          <Separator />
+          
           <div>
-            <p className="text-sm text-muted-foreground">Data e Horário</p>
-            <p className="font-medium">{date ? formatDate(date) : "Nenhuma data selecionada"}</p>
-            {time && <p className="text-sm text-muted-foreground mt-1">{time}</p>}
-          </div>
-        </div>
-        
-        <div className="flex items-start space-x-3">
-          <div className="rounded-full p-2 bg-primary/10">
-            <User className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Prestador</p>
-            <p className="font-medium">{professionalName || "Nenhum profissional selecionado"}</p>
-          </div>
-        </div>
-
-        {(clientName || clientPhone || clientCpf) && (
-          <div className="flex items-start space-x-3">
-            <div className="rounded-full p-2 bg-primary/10">
-              <User className="h-4 w-4 text-primary" />
+            <h3 className="text-lg font-semibold">Data e Horário</h3>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              <span>{date ? format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : 'Data não selecionada'}</span>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Seus dados</p>
-              <p className="font-medium">{clientName}</p>
-              {clientPhone && (
-                <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                  <Phone className="h-3 w-3 mr-1" />
-                  <span>{clientPhone}</span>
-                </div>
-              )}
-              {clientCpf && (
-                <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                  <CreditCard className="h-3 w-3 mr-1" />
-                  <span>{clientCpf}</span>
-                </div>
-              )}
+            <div className="flex items-center gap-1 text-muted-foreground mt-1">
+              <Clock className="h-4 w-4" />
+              <span>{time || 'Horário não selecionado'}</span>
             </div>
           </div>
-        )}
+          
+          <Separator />
+          
+          <div>
+            <h3 className="text-lg font-semibold">Dados do Cliente</h3>
+            <div className="space-y-1 text-muted-foreground">
+              <p>{clientName}</p>
+              <p>{formatPhone(clientPhone)}</p>
+              <p>{formatCpf(clientCpf)}</p>
+            </div>
+          </div>
+          
+          <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onEdit}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              Editar
+            </Button>
+            <Button
+              onClick={onConfirm}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              {isSubmitting ? 'Confirmando...' : 'Confirmar'}
+            </Button>
+          </div>
+        </div>
       </CardContent>
-      <CardFooter className="flex flex-col space-y-2">
-        <Button 
-          onClick={onConfirm} 
-          className="w-full" 
-          disabled={!allDetailsProvided || isSubmitting}
-        >
-          {isSubmitting ? "Processando..." : "Confirmar Agendamento"}
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={onEdit} 
-          className="w-full" 
-          disabled={isSubmitting}
-        >
-          Editar Detalhes
-        </Button>
-      </CardFooter>
     </Card>
   );
 };

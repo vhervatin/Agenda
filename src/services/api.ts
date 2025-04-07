@@ -1,6 +1,53 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Company, User, Service, Professional, TimeSlot, Appointment, WebhookConfiguration, WebhookLog } from '@/types/types';
 
+// Convenio related functions
+export const fetchConvenios = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('convenios')
+      .select('*')
+      .order('nome');
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching convenios:', error);
+    return [];
+  }
+};
+
+export const createConvenio = async (convenio: { nome: string }) => {
+  try {
+    const { data, error } = await supabase
+      .from('convenios')
+      .insert(convenio)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating convenio:', error);
+    throw error;
+  }
+};
+
+export const deleteConvenio = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from('convenios')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting convenio:', error);
+    throw error;
+  }
+};
+
 // User related functions
 export const createUserForCompany = async (user: Omit<User, 'id' | 'created_at' | 'updated_at'>, companyId: string) => {
   try {
@@ -280,16 +327,16 @@ export const dissociateProfessionalService = async (associationId: string) => {
 };
 
 // Time slot related functions
-export const fetchAvailableSlots = async (date: string, professionalId?: string) => {
+export const fetchAvailableSlots = async (date: string, professionalId?: string, convenioId?: string | null) => {
   try {
     // Extract the date part to filter by appointment date
     const formattedDate = date;
     
-    console.log('Fetching slots for date:', formattedDate);
+    console.log('Fetching slots for date:', formattedDate, 'professional:', professionalId, 'convenio:', convenioId);
     
     let query = supabase
       .from('available_slots')
-      .select('*');
+      .select('*, convenios(nome)');
     
     // Add filter for date based on start_time
     if (formattedDate) {
@@ -310,6 +357,14 @@ export const fetchAvailableSlots = async (date: string, professionalId?: string)
       query = query.eq('professional_id', professionalId);
     }
     
+    // Add filter for convenio_id if provided
+    if (convenioId) {
+      query = query.eq('convenio_id', convenioId);
+    } else if (convenioId === null) {
+      // If convenioId is explicitly null, include slots with no convenio and with any convenio
+      // No additional filter needed
+    }
+    
     const { data, error } = await query;
     
     if (error) throw error;
@@ -324,6 +379,8 @@ export const fetchAvailableSlots = async (date: string, professionalId?: string)
       start_time: slot.start_time,
       end_time: slot.end_time,
       professional_id: slot.professional_id,
+      convenio_id: slot.convenio_id,
+      convenio_nome: slot.convenios?.nome,
       is_available: slot.is_available
     }));
     

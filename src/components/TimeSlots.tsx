@@ -9,6 +9,10 @@ export interface TimeSlot {
   available: boolean;
   start_time?: string;
   end_time?: string;
+  professional_id?: string;
+  convenio_id?: string;
+  convenio_nome?: string;
+  is_available?: boolean;
 }
 
 interface TimeSlotsProps {
@@ -63,14 +67,24 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               selectedSlot === slot.id && "bg-primary text-primary-foreground hover:bg-primary hover:border-primary",
               !slot.available && "opacity-40 cursor-not-allowed bg-muted hover:bg-muted hover:border-border"
             )}
-            aria-label={`Horário ${slot.time} ${slot.available ? 'disponível' : 'indisponível'}`}
+            aria-label={`Horário ${slot.time} ${slot.available ? 'disponível' : 'indisponível'}${slot.convenio_nome ? ` (${slot.convenio_nome})` : ''}`}
           >
-            <div className="flex items-center justify-center">
-              <Clock className={cn(
-                "h-3 w-3 mr-2",
-                selectedSlot === slot.id ? "text-primary-foreground" : "text-muted-foreground"
-              )} />
-              <span className="text-sm font-medium">{slot.time}</span>
+            <div className="flex flex-col items-center justify-center">
+              <div className="flex items-center justify-center">
+                <Clock className={cn(
+                  "h-3 w-3 mr-2",
+                  selectedSlot === slot.id ? "text-primary-foreground" : "text-muted-foreground"
+                )} />
+                <span className="text-sm font-medium">{slot.time}</span>
+              </div>
+              {slot.convenio_nome && (
+                <span className={cn(
+                  "text-xs mt-1",
+                  selectedSlot === slot.id ? "text-primary-foreground/80" : "text-muted-foreground"
+                )}>
+                  {slot.convenio_nome}
+                </span>
+              )}
             </div>
           </button>
         ))}

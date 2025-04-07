@@ -1,3 +1,4 @@
+
 export interface Service {
   id: string;
   name: string;
@@ -18,6 +19,12 @@ export interface Professional {
   professionals?: Professional; // For nested professional objects from the API
 }
 
+export interface Convenio {
+  id: string;
+  nome: string;
+  created_at?: string;
+}
+
 export interface TimeSlot {
   id: string;
   time: string;
@@ -26,6 +33,8 @@ export interface TimeSlot {
   end_time: string;
   professional_id?: string;
   is_available?: boolean;
+  convenio_id?: string;
+  convenio_nome?: string;
 }
 
 export interface Appointment {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,21 +13,25 @@ import ClientInfoForm from '@/components/ClientInfoForm';
 import AppointmentSummary from '@/components/AppointmentSummary';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { 
   fetchProfessionalServices, 
   fetchServiceProfessionals, 
   fetchAvailableSlots,
-  createAppointment 
+  createAppointment,
+  fetchConvenios
 } from '@/services/api';
 import { Professional, Service, TimeSlot } from '@/types/types';
 
-const STEPS = ["Serviço", "Profissional", "Data", "Horário", "Dados", "Confirmação"];
+const STEPS = ["Serviço", "Profissional", "Convênio", "Data", "Horário", "Dados", "Confirmação"];
 
 const Booking = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
+  const [selectedConvenio, setSelectedConvenio] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
@@ -53,11 +58,19 @@ const Booking = () => {
     queryFn: () => selectedService ? fetchServiceProfessionals(selectedService) : Promise.resolve([]),
     enabled: !!selectedService
   });
+
+  const {
+    data: convenios = [],
+    isLoading: isLoadingConvenios,
+  } = useQuery({
+    queryKey: ['convenios'],
+    queryFn: fetchConvenios
+  });
   
   useEffect(() => {
     if (selectedProfessional && selectedDate) {
       const formattedDate = selectedDate.toISOString().split('T')[0];
-      fetchAvailableSlots(formattedDate, selectedProfessional)
+      fetchAvailableSlots(formattedDate, selectedProfessional, selectedConvenio)
         .then(slots => {
           setTimeSlots(slots);
           setSelectedTimeSlot(null);
@@ -67,7 +80,7 @@ const Booking = () => {
           toast.error("Não foi possível carregar os horários disponíveis");
         });
     }
-  }, [selectedProfessional, selectedDate]);
+  }, [selectedProfessional, selectedDate, selectedConvenio]);
 
   useEffect(() => {
     if (selectedProfessional) {
@@ -85,6 +98,10 @@ const Booking = () => {
   
   const selectedTimeObject = selectedTimeSlot
     ? timeSlots.find(slot => slot.id === selectedTimeSlot)
+    : null;
+
+  const selectedConvenioObject = selectedConvenio
+    ? convenios.find(convenio => convenio.id === selectedConvenio) || null
     : null;
   
   const handleNextStep = () => {
@@ -199,9 +216,10 @@ const Booking = () => {
     switch (currentStep) {
       case 0: return !!selectedService;
       case 1: return !!selectedProfessional;
-      case 2: return !!selectedDate;
-      case 3: return !!selectedTimeSlot;
-      case 4: return !!clientName && !!clientPhone && !!clientCpf && clientCpf.replace(/\D/g, '').length === 11 && cpfIsValid;
+      case 2: return true; // Convênio is optional
+      case 3: return !!selectedDate;
+      case 4: return !!selectedTimeSlot;
+      case 5: return !!clientName && !!clientPhone && !!clientCpf && clientCpf.replace(/\D/g, '').length === 11 && cpfIsValid;
       default: return true;
     }
   };
@@ -292,6 +310,46 @@ const Booking = () => {
       case 2:
         return (
           <div className="space-y-6 animate-fade-in">
+            <h2 className="text-2xl font-bold mb-4">Selecione seu convênio</h2>
+            
+            {isLoadingConvenios ? (
+              <div className="text-center py-8">Carregando convênios...</div>
+            ) : (
+              <div className="max-w-md mx-auto">
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="convenio">Convênio (opcional)</Label>
+                    <Select
+                      value={selectedConvenio || 'none'}
+                      onValueChange={(value) => setSelectedConvenio(value === 'none' ? null : value)}
+                    >
+                      <SelectTrigger id="convenio" className="w-full">
+                        <SelectValue placeholder="Selecione seu convênio (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem convênio</SelectItem>
+                        {convenios.map((convenio) => (
+                          <SelectItem key={convenio.id} value={convenio.id}>
+                            {convenio.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground">
+                    {selectedConvenio 
+                      ? `Você selecionou o convênio: ${selectedConvenioObject?.nome}` 
+                      : "Selecionar um convênio é opcional. Se você não possui convênio, pode avançar para o próximo passo."}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      case 3:
+        return (
+          <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha uma data</h2>
             <div className="max-w-md mx-auto">
               <DatePicker
@@ -301,7 +359,7 @@ const Booking = () => {
             </div>
           </div>
         );
-      case 3:
+      case 4:
         return (
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha um horário</h2>
@@ -312,7 +370,7 @@ const Booking = () => {
             />
           </div>
         );
-      case 4:
+      case 5:
         return (
           <ClientInfoForm
             clientName={clientName}
@@ -323,7 +381,7 @@ const Booking = () => {
             onClientCpfChange={setClientCpf}
           />
         );
-      case 5:
+      case 6:
         return (
           <div className="max-w-md mx-auto">
             <AppointmentSummary
@@ -343,6 +401,7 @@ const Booking = () => {
               onConfirm={handleConfirmAppointment}
               onEdit={() => setCurrentStep(0)}
               isSubmitting={isSubmitting}
+              convenio={selectedConvenioObject?.nome}
             />
           </div>
         );

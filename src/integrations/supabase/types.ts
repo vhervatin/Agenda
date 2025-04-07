@@ -75,6 +75,7 @@ export type Database = {
       }
       available_slots: {
         Row: {
+          convenio_id: string | null
           created_at: string | null
           end_time: string
           id: string
@@ -84,6 +85,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          convenio_id?: string | null
           created_at?: string | null
           end_time: string
           id?: string
@@ -93,6 +95,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          convenio_id?: string | null
           created_at?: string | null
           end_time?: string
           id?: string
@@ -102,6 +105,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "available_slots_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "convenios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "available_slots_professional_id_fkey"
             columns: ["professional_id"]
@@ -153,6 +163,24 @@ export type Database = {
           secondary_color?: string | null
           slug?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      convenios: {
+        Row: {
+          created_at: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          nome?: string
         }
         Relationships: []
       }
