@@ -530,6 +530,20 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
       .single();
       
     if (error) throw error;
+    
+    // If the appointment is cancelled, mark the slot as available again
+    if (status === 'cancelled' && data && data.slot_id) {
+      const { error: slotError } = await supabase
+        .from('available_slots')
+        .update({ is_available: true })
+        .eq('id', data.slot_id);
+        
+      if (slotError) {
+        console.error('Error updating slot availability:', slotError);
+        // Don't throw here so the appointment status update still succeeds
+      }
+    }
+    
     return data;
   } catch (error) {
     console.error('Error updating appointment status:', error);

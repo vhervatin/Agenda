@@ -63,6 +63,7 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
               selectedSlot === slot.id && "bg-primary text-primary-foreground hover:bg-primary hover:border-primary",
               !slot.available && "opacity-40 cursor-not-allowed bg-muted hover:bg-muted hover:border-border"
             )}
+            aria-label={`Horário ${slot.time} ${slot.available ? 'disponível' : 'indisponível'}`}
           >
             <div className="flex items-center justify-center">
               <Clock className={cn(
