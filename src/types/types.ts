@@ -35,6 +35,7 @@ export interface TimeSlot {
   is_available?: boolean;
   convenio_id?: string;
   convenio_nome?: string;
+  convenios?: Convenio;
 }
 
 export interface Appointment {
@@ -52,6 +53,9 @@ export interface Appointment {
   professionals?: Professional;
   services?: Service;
   slots?: TimeSlot;
+  convenio_id?: string;
+  convenio_nome?: string;
+  convenios?: Convenio;
 }
 
 export interface TimeRange {

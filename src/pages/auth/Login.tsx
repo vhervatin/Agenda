@@ -61,10 +61,10 @@ const Login = () => {
       const email = form.getValues().email;
       if (email === "glivan.santos090420@gmail.com") {
         localStorage.setItem('userType', 'superadmin');
-        navigate("/superadmin/dashboard");
+        navigate("/superadmin");
       } else {
         localStorage.setItem('userType', 'admin');
-        navigate("/admin/dashboard");
+        navigate("/admin");
       }
       
       setLoginError(null);

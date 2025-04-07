@@ -54,7 +54,7 @@ export const useAuth = () => {
           
           // Check if we're already in a superadmin route
           if (!window.location.pathname.startsWith('/superadmin')) {
-            navigate('/superadmin/dashboard');
+            navigate('/superadmin');
           }
         } else {
           const tipo = (userData?.tipo_usuario === 'admin' ? 'admin' : 'admin') as UserType;
@@ -63,7 +63,7 @@ export const useAuth = () => {
           
           // Only redirect if not in an admin route already
           if (tipo === 'admin' && !window.location.pathname.startsWith('/admin')) {
-            navigate('/admin/dashboard');
+            navigate('/admin');
           }
         }
         

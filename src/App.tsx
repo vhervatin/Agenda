@@ -54,6 +54,7 @@ function App() {
           
           {/* Admin routes */}
           <Route path="/admin" element={<Dashboard />} />
+          <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/professionals" element={<Professionals />} />
           <Route path="/admin/services" element={<Services />} />
           <Route path="/admin/convenios" element={<Convenios />} />
@@ -64,6 +65,7 @@ function App() {
           
           {/* SuperAdmin routes */}
           <Route path="/superadmin" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
           <Route path="/superadmin/companies" element={<Companies />} />
           
           {/* 404 route */}
