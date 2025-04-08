@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,12 +11,14 @@ interface DatePickerProps {
   onDateSelect: (date: Date) => void;
   disabledDates?: Date[];
   className?: string;
+  availableDates?: string[]; // Array of date strings that have available slots
 }
 
 const DatePicker: React.FC<DatePickerProps> = ({
   selectedDate,
   onDateSelect,
   disabledDates = [],
+  availableDates = [],
   className,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -50,7 +52,15 @@ const DatePicker: React.FC<DatePickerProps> = ({
     if (isBefore(date, today)) return true;
     
     // Disable specific dates provided
-    return disabledDates.some(disabledDate => isSameDay(disabledDate, date));
+    if (disabledDates.some(disabledDate => isSameDay(disabledDate, date))) return true;
+    
+    // If availableDates is provided, only enable dates in that list
+    if (availableDates.length > 0) {
+      const dateString = format(date, 'yyyy-MM-dd');
+      return !availableDates.includes(dateString);
+    }
+    
+    return false;
   };
 
   return (

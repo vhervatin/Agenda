@@ -1,64 +1,44 @@
-import { supabase } from "@/integrations/supabase/client";
-import { Service, Professional, Appointment, TimeSlot, WebhookConfiguration, WebhookLog, User, Convenio, ProfessionalService } from "@/types/types";
+import { createClient } from '@supabase/supabase-js';
+import { Service, Professional, TimeSlot, Appointment, Convenio, WebhookConfiguration, WebhookLog, Company, User, ProfessionalService } from '@/types/types';
 
-// Convenios API Functions
-export const fetchConvenios = async (): Promise<Convenio[]> => {
-  const { data, error } = await supabase
-    .from('convenios')
-    .select('*')
-    .order('nome');
-  
-  if (error) {
-    console.error("Error fetching convenios:", error);
-    throw error;
-  }
-  
-  return data || [];
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const createConvenio = async (convenio: { nome: string }): Promise<Convenio> => {
-  const { data, error } = await supabase
-    .from('convenios')
-    .insert(convenio)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error("Error creating convenio:", error);
-    throw error;
-  }
-  
-  return data;
-};
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-export const deleteConvenio = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from('convenios')
-    .delete()
-    .eq('id', id);
-  
-  if (error) {
-    console.error("Error deleting convenio:", error);
-    throw error;
-  }
-};
-
-// Services API Functions
-export const fetchServices = async (): Promise<Service[]> => {
+// Function to fetch the professional services
+export const fetchProfessionalServices = async (): Promise<Service[]> => {
   const { data, error } = await supabase
     .from('services')
     .select('*')
-    .order('name');
+    .eq('active', true);
 
   if (error) {
-    console.error("Error fetching services:", error);
-    throw error;
+    console.error('Error fetching services:', error);
+    throw new Error('Failed to fetch services');
   }
 
   return data || [];
 };
 
-export const createService = async (service: Omit<Service, 'id'>): Promise<Service> => {
+// Function to fetch a single service by ID
+export const fetchServiceById = async (id: string): Promise<Service | null> => {
+  const { data, error } = await supabase
+    .from('services')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching service:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to create a new service
+export const createService = async (service: Omit<Service, 'id'>): Promise<Service | null> => {
   const { data, error } = await supabase
     .from('services')
     .insert([service])
@@ -66,14 +46,15 @@ export const createService = async (service: Omit<Service, 'id'>): Promise<Servi
     .single();
 
   if (error) {
-    console.error("Error creating service:", error);
-    throw error;
+    console.error('Error creating service:', error);
+    return null;
   }
 
   return data;
 };
 
-export const updateService = async (id: string, updates: Partial<Service>): Promise<Service> => {
+// Function to update an existing service
+export const updateService = async (id: string, updates: Partial<Service>): Promise<Service | null> => {
   const { data, error } = await supabase
     .from('services')
     .update(updates)
@@ -82,108 +63,61 @@ export const updateService = async (id: string, updates: Partial<Service>): Prom
     .single();
 
   if (error) {
-    console.error("Error updating service:", error);
-    throw error;
+    console.error('Error updating service:', error);
+    return null;
   }
 
   return data;
 };
 
-export const deleteService = async (id: string): Promise<void> => {
+// Function to delete a service
+export const deleteService = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('services')
     .delete()
     .eq('id', id);
 
   if (error) {
-    console.error("Error deleting service:", error);
-    throw error;
+    console.error('Error deleting service:', error);
+    return false;
   }
+
+  return true;
 };
 
-// Professional-Service Association Functions
-export const fetchProfessionalServices = async (): Promise<Service[]> => {
+// Function to fetch all professionals
+export const fetchProfessionals = async (): Promise<Professional[]> => {
   const { data, error } = await supabase
-    .from('services')
+    .from('professionals')
     .select('*')
-    .eq('active', true)
-    .order('name');
+    .eq('active', true);
 
   if (error) {
-    console.error("Error fetching professional services:", error);
-    throw error;
+    console.error('Error fetching professionals:', error);
+    throw new Error('Failed to fetch professionals');
   }
 
   return data || [];
 };
 
-export const fetchServiceProfessionals = async (serviceId: string): Promise<Professional[]> => {
+// Function to fetch a single professional by ID
+export const fetchProfessionalById = async (id: string): Promise<Professional | null> => {
   const { data, error } = await supabase
-    .from('professional_services')
-    .select(`
-      professional_id,
-      professionals (*)
-    `)
-    .eq('service_id', serviceId);
-
-  if (error) {
-    console.error("Error fetching service professionals:", error);
-    throw error;
-  }
-
-  // Extract professionals from nested structure
-  return data.map(item => item.professionals).filter(Boolean) || [];
-};
-
-export const associateProfessionalService = async (professionalId: string, serviceId: string): Promise<ProfessionalService> => {
-  const { data, error } = await supabase
-    .from('professional_services')
-    .insert({
-      professional_id: professionalId,
-      service_id: serviceId
-    })
-    .select()
+    .from('professionals')
+    .select('*')
+    .eq('id', id)
     .single();
 
   if (error) {
-    console.error("Error associating professional with service:", error);
-    throw error;
+    console.error('Error fetching professional:', error);
+    return null;
   }
 
   return data;
 };
 
-export const dissociateProfessionalService = async (professionalId: string, serviceId: string): Promise<void> => {
-  const { error } = await supabase
-    .from('professional_services')
-    .delete()
-    .match({
-      professional_id: professionalId,
-      service_id: serviceId
-    });
-
-  if (error) {
-    console.error("Error dissociating professional from service:", error);
-    throw error;
-  }
-};
-
-// Professionals API Functions
-export const fetchProfessionals = async (): Promise<Professional[]> => {
-  const { data, error } = await supabase
-    .from('professionals')
-    .select('*')
-    .order('name');
-
-  if (error) {
-    console.error("Error fetching professionals:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-export const createProfessional = async (professional: Omit<Professional, 'id'>): Promise<Professional> => {
+// Function to create a new professional
+export const createProfessional = async (professional: Omit<Professional, 'id'>): Promise<Professional | null> => {
   const { data, error } = await supabase
     .from('professionals')
     .insert([professional])
@@ -191,14 +125,15 @@ export const createProfessional = async (professional: Omit<Professional, 'id'>)
     .single();
 
   if (error) {
-    console.error("Error creating professional:", error);
-    throw error;
+    console.error('Error creating professional:', error);
+    return null;
   }
 
   return data;
 };
 
-export const updateProfessional = async (id: string, updates: Partial<Professional>): Promise<Professional> => {
+// Function to update an existing professional
+export const updateProfessional = async (id: string, updates: Partial<Professional>): Promise<Professional | null> => {
   const { data, error } = await supabase
     .from('professionals')
     .update(updates)
@@ -207,181 +142,337 @@ export const updateProfessional = async (id: string, updates: Partial<Profession
     .single();
 
   if (error) {
-    console.error("Error updating professional:", error);
-    throw error;
+    console.error('Error updating professional:', error);
+    return null;
   }
 
   return data;
 };
 
-export const deleteProfessional = async (id: string): Promise<void> => {
+// Function to delete a professional
+export const deleteProfessional = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('professionals')
     .delete()
     .eq('id', id);
 
   if (error) {
-    console.error("Error deleting professional:", error);
-    throw error;
+    console.error('Error deleting professional:', error);
+    return false;
   }
+
+  return true;
 };
 
-// Appointments API Functions
-export const fetchAppointments = async ({ queryKey }: { queryKey: [string, string?] }): Promise<Appointment[]> => {
-  const [_, date] = queryKey;
-  
+// Function to fetch professionals by service ID
+export const fetchServiceProfessionals = async (serviceId: string): Promise<Professional[]> => {
+  const { data: professionalServices, error: psError } = await supabase
+    .from('professional_services')
+    .select('professional_id')
+    .eq('service_id', serviceId);
+
+  if (psError) {
+    console.error('Error fetching professional services:', psError);
+    return [];
+  }
+
+  const professionalIds = professionalServices.map(ps => ps.professional_id);
+
+  if (professionalIds.length === 0) {
+    return [];
+  }
+
+  const { data: professionals, error: pError } = await supabase
+    .from('professionals')
+    .select('*')
+    .in('id', professionalIds)
+    .eq('active', true);
+
+  if (pError) {
+    console.error('Error fetching professionals:', pError);
+    return [];
+  }
+
+  return professionals || [];
+};
+
+// Function to fetch all convenios
+export const fetchConvenios = async (): Promise<Convenio[]> => {
+  const { data, error } = await supabase
+    .from('convenios')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching convenios:', error);
+    throw new Error('Failed to fetch convenios');
+  }
+
+  return data || [];
+};
+
+// Function to fetch a single convenio by ID
+export const fetchConvenioById = async (id: string): Promise<Convenio | null> => {
+  const { data, error } = await supabase
+    .from('convenios')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching convenio:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to create a new convenio
+export const createConvenio = async (convenio: Omit<Convenio, 'id'>): Promise<Convenio | null> => {
+  const { data, error } = await supabase
+    .from('convenios')
+    .insert([convenio])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating convenio:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to update an existing convenio
+export const updateConvenio = async (id: string, updates: Partial<Convenio>): Promise<Convenio | null> => {
+  const { data, error } = await supabase
+    .from('convenios')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating convenio:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to delete a convenio
+export const deleteConvenio = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('convenios')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting convenio:', error);
+    return false;
+  }
+
+  return true;
+};
+
+// Fetch available slots by date and professional
+export const fetchAvailableSlots = async (
+  date: string,
+  professionalId?: string,
+  convenioId?: string | null
+): Promise<TimeSlot[]> => {
   let query = supabase
-    .from('appointments')
+    .from('available_slots')
     .select(`
       *,
-      professionals (*),
-      services (*),
-      slots:available_slots (
-        *,
-        convenios(*)
+      convenios (
+        nome
       )
     `)
-    .order('created_at', { ascending: false });
+    .eq('is_available', true);
+
+  if (professionalId) {
+    query = query.eq('professional_id', professionalId);
+  }
 
   if (date) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    // Filter by the specified date (ignoring time part)
+    const startOfDay = `${date}T00:00:00`;
+    const endOfDay = `${date}T23:59:59`;
     
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    query = query
-      .gte('appointment_date', startOfDay.toISOString())
-      .lte('appointment_date', endOfDay.toISOString());
+    query = query.gte('start_time', startOfDay).lte('start_time', endOfDay);
+  }
+
+  // Filter by convenio if specified
+  if (convenioId) {
+    query = query.eq('convenio_id', convenioId);
+  } else if (convenioId === null) {
+    // If null is explicitly passed, look for slots with no convenio
+    query = query.is('convenio_id', null);
+  }
+  
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching available slots:', error);
+    throw new Error('Failed to fetch available slots');
+  }
+
+  // Format the time slots for display
+  return (data || []).map(slot => ({
+    id: slot.id,
+    time: new Date(slot.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    available: slot.is_available || false,
+    start_time: slot.start_time,
+    end_time: slot.end_time,
+    professional_id: slot.professional_id,
+    convenio_id: slot.convenio_id,
+    convenio_nome: slot.convenios?.nome,
+    is_available: slot.is_available
+  }));
+};
+
+// Function to create available slots in bulk
+export const createAvailableSlotsBulk = async (slots: Omit<TimeSlot, 'id' | 'time' | 'available'>[]): Promise<TimeSlot[]> => {
+  const { data, error } = await supabase
+    .from('available_slots')
+    .insert(slots)
+    .select();
+
+  if (error) {
+    console.error('Error creating available slots:', error);
+    throw new Error('Failed to create available slots');
+  }
+
+  return data || [];
+};
+
+// Function to delete an available slot by ID
+export const deleteAvailableSlot = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('available_slots')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting available slot:', error);
+    return false;
+  }
+
+  return true;
+};
+
+// Function to delete available slots by date
+export const deleteAvailableSlotsByDate = async (date: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('available_slots')
+    .delete()
+    .gte('start_time', `${date}T00:00:00`)
+    .lte('start_time', `${date}T23:59:59`);
+
+  if (error) {
+    console.error('Error deleting available slots for date:', error);
+    return false;
+  }
+
+  return true;
+};
+
+// Fetch available dates for a professional and convênio
+export const fetchAvailableDates = async (
+  professionalId: string,
+  convenioId: string | null
+): Promise<string[]> => {
+  let query = supabase
+    .from('available_slots')
+    .select('start_time')
+    .eq('is_available', true)
+    .eq('professional_id', professionalId);
+
+  // Filter by convenio if specified
+  if (convenioId) {
+    query = query.eq('convenio_id', convenioId);
+  } else if (convenioId === null) {
+    // If null is explicitly passed, look for slots with no convenio
+    query = query.is('convenio_id', null);
   }
 
   const { data, error } = await query;
 
   if (error) {
-    console.error("Error fetching appointments:", error);
-    throw error;
+    console.error('Error fetching available dates:', error);
+    throw new Error('Failed to fetch available dates');
   }
 
-  // Transform the data to include the required TimeSlot properties
-  return (data || []).map(item => ({
-    ...item,
-    status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed",
-    convenio_id: item.slots?.convenio_id,
-    convenio_nome: item.slots?.convenios?.nome,
-    slots: item.slots ? {
-      ...item.slots,
-      time: new Date(item.slots.start_time).toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      available: Boolean(item.slots.is_available),
-      convenio_id: item.slots.convenio_id,
-      convenio_nome: item.slots.convenios?.nome
-    } : undefined
-  }));
+  // Extract unique dates from the slots
+  const uniqueDates = new Set<string>();
+  (data || []).forEach(slot => {
+    const dateString = new Date(slot.start_time).toISOString().split('T')[0];
+    uniqueDates.add(dateString);
+  });
+
+  return Array.from(uniqueDates);
 };
 
-export const fetchAppointmentById = async (id: string): Promise<Appointment | null> => {
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      professionals (*),
-      services (*),
-      slots:available_slots (
-        *,
-        convenios(*)
-      )
-    `)
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') {
-      // Not found error
-      return null;
-    }
-    console.error("Error fetching appointment:", error);
-    throw error;
-  }
-
-  // Transform to include required TimeSlot properties
-  return {
-    ...data,
-    status: (data.status as "confirmed" | "cancelled" | "completed") || "confirmed",
-    convenio_id: data.slots?.convenio_id,
-    convenio_nome: data.slots?.convenios?.nome,
-    slots: data.slots ? {
-      ...data.slots,
-      time: new Date(data.slots.start_time).toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      available: Boolean(data.slots.is_available),
-      convenio_id: data.slots.convenio_id,
-      convenio_nome: data.slots.convenios?.nome
-    } : undefined
-  };
-};
-
-export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]> => {
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      professionals (*),
-      services (*),
-      slots:available_slots (
-        *,
-        convenios(*)
-      )
-    `)
-    .eq('client_cpf', cpf)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error("Error fetching appointments by CPF:", error);
-    throw error;
-  }
-
-  // Transform to include required TimeSlot properties
-  return (data || []).map(item => ({
-    ...item,
-    status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed",
-    convenio_id: item.slots?.convenio_id,
-    convenio_nome: item.slots?.convenios?.nome,
-    slots: item.slots ? {
-      ...item.slots,
-      time: new Date(item.slots.start_time).toLocaleTimeString('pt-BR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      available: Boolean(item.slots.is_available),
-      convenio_id: item.slots.convenio_id,
-      convenio_nome: item.slots.convenios?.nome
-    } : undefined
-  }));
-};
-
-export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>): Promise<Appointment> => {
+// Function to create a new appointment
+export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>): Promise<{ id: string }> => {
   const { data, error } = await supabase
     .from('appointments')
     .insert([appointment])
-    .select()
+    .select('id')
     .single();
 
   if (error) {
-    console.error("Error creating appointment:", error);
-    throw error;
+    console.error('Error creating appointment:', error);
+    throw new Error('Failed to create appointment');
   }
 
-  return {
-    ...data,
-    status: (data.status as "confirmed" | "cancelled" | "completed") || "confirmed"
-  };
+  return data;
 };
 
-export const updateAppointment = async (id: string, updates: Partial<Appointment>): Promise<Appointment> => {
+// Function to fetch appointments with filters
+export const fetchAppointments = async (filters?: any): Promise<Appointment[]> => {
+  let query = supabase
+    .from('appointments')
+    .select(`
+      *,
+      professionals:professional_id (*),
+      services:service_id (*),
+      slots:slot_id (*),
+      convenios:convenio_id (*)
+    `);
+
+  // Apply filters if provided
+  if (filters) {
+    if (filters.date) {
+      const startOfDay = `${filters.date}T00:00:00`;
+      const endOfDay = `${filters.date}T23:59:59`;
+      query = query.gte('appointment_date', startOfDay).lte('appointment_date', endOfDay);
+    }
+    
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+    
+    if (filters.professional_id) {
+      query = query.eq('professional_id', filters.professional_id);
+    }
+  }
+
+  const { data, error } = await query.order('appointment_date', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching appointments:', error);
+    throw new Error('Failed to fetch appointments');
+  }
+
+  return data.map(appointment => ({
+    ...appointment,
+    convenio_nome: appointment.convenios?.nome
+  })) || [];
+};
+
+// Function to update an existing appointment
+export const updateAppointment = async (id: string, updates: Partial<Appointment>): Promise<Appointment | null> => {
   const { data, error } = await supabase
     .from('appointments')
     .update(updates)
@@ -390,258 +481,60 @@ export const updateAppointment = async (id: string, updates: Partial<Appointment
     .single();
 
   if (error) {
-    console.error("Error updating appointment:", error);
-    throw error;
+    console.error('Error updating appointment:', error);
+    return null;
   }
 
-  return {
-    ...data,
-    status: (data.status as "confirmed" | "cancelled" | "completed") || "confirmed"
-  };
+  return data;
 };
 
-export const updateAppointmentStatus = async (id: string, status: "confirmed" | "cancelled" | "completed"): Promise<Appointment> => {
-  return updateAppointment(id, { status });
-};
-
-export const deleteAppointment = async (id: string): Promise<void> => {
+// Function to delete an appointment
+export const deleteAppointment = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('appointments')
     .delete()
     .eq('id', id);
 
   if (error) {
-    console.error("Error deleting appointment:", error);
-    throw error;
+    console.error('Error deleting appointment:', error);
+    return false;
   }
+
+  return true;
 };
 
-// Time slots API Functions
-export const fetchAvailableTimeSlots = async (
-  date: string,
-  professionalId?: string,
-  convenioId?: string
-): Promise<TimeSlot[]> => {
-  let query = supabase
-    .from('available_slots')
-    .select(`
-      *,
-      convenios(*)
-    `)
-    .eq('is_available', true);
-  
-  // Filter by date if provided
-  if (date) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    query = query
-      .gte('start_time', startOfDay.toISOString())
-      .lte('start_time', endOfDay.toISOString());
-  }
-  
-  // Filter by professional ID if provided
-  if (professionalId) {
-    query = query.eq('professional_id', professionalId);
-  }
-  
-  // Filter by convenio ID if provided
-  if (convenioId) {
-    query = query.eq('convenio_id', convenioId);
-  }
-  
-  const { data, error } = await query.order('start_time');
-  
-  if (error) {
-    console.error("Error fetching available time slots:", error);
-    throw error;
-  }
-  
-  return data.map(slot => ({
-    id: slot.id,
-    time: new Date(slot.start_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    available: true,
-    start_time: slot.start_time,
-    end_time: slot.end_time,
-    professional_id: slot.professional_id,
-    is_available: slot.is_available,
-    convenio_id: slot.convenio_id,
-    convenio_nome: slot.convenios?.nome,
-    convenios: slot.convenios
-  })) || [];
-};
-
-// Alias for backward compatibility
-export const fetchAvailableSlots = fetchAvailableTimeSlots;
-
-export const createTimeSlot = async (
-  professionalId: string,
-  startTime: string,
-  endTime: string,
-  convenioId?: string
-): Promise<TimeSlot> => {
-  const { data, error } = await supabase
-    .from('available_slots')
-    .insert({
-      professional_id: professionalId,
-      start_time: startTime,
-      end_time: endTime,
-      is_available: true,
-      convenio_id: convenioId
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating time slot:", error);
-    throw error;
-  }
-
-  return {
-    id: data.id,
-    time: new Date(data.start_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    available: true,
-    start_time: data.start_time,
-    end_time: data.end_time,
-    professional_id: data.professional_id,
-    is_available: data.is_available,
-    convenio_id: data.convenio_id
-  };
-};
-
-export const createAvailableSlotsBulk = async (
-  slots: Array<{
-    professional_id: string;
-    start_time: string;
-    end_time: string;
-    convenio_id?: string;
-  }>
-): Promise<TimeSlot[]> => {
-  const { data, error } = await supabase
-    .from('available_slots')
-    .insert(slots.map(slot => ({
-      ...slot,
-      is_available: true
-    })))
-    .select();
-
-  if (error) {
-    console.error("Error creating bulk time slots:", error);
-    throw error;
-  }
-
-  return data.map(slot => ({
-    id: slot.id,
-    time: new Date(slot.start_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    available: true,
-    start_time: slot.start_time,
-    end_time: slot.end_time,
-    professional_id: slot.professional_id,
-    is_available: slot.is_available,
-    convenio_id: slot.convenio_id
-  }));
-};
-
-export const updateTimeSlot = async (id: string, updates: Partial<TimeSlot>): Promise<TimeSlot> => {
-  const { data, error } = await supabase
-    .from('available_slots')
-    .update({
-      professional_id: updates.professional_id,
-      start_time: updates.start_time,
-      end_time: updates.end_time,
-      is_available: updates.is_available,
-      convenio_id: updates.convenio_id
-    })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating time slot:", error);
-    throw error;
-  }
-
-  return {
-    id: data.id,
-    time: new Date(data.start_time).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    available: true,
-    start_time: data.start_time,
-    end_time: data.end_time,
-    professional_id: data.professional_id,
-    is_available: data.is_available,
-    convenio_id: data.convenio_id
-  };
-};
-
-export const deleteTimeSlot = async (id: string): Promise<void> => {
-  const { error } = await supabase
-    .from('available_slots')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error("Error deleting time slot:", error);
-    throw error;
-  }
-};
-
-export const deleteAvailableSlot = deleteTimeSlot;
-
-export const deleteAvailableSlotsByDate = async (date: string, professionalId?: string): Promise<void> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-  
-  let query = supabase
-    .from('available_slots')
-    .delete()
-    .gte('start_time', startOfDay.toISOString())
-    .lte('start_time', endOfDay.toISOString());
-  
-  if (professionalId) {
-    query = query.eq('professional_id', professionalId);
-  }
-  
-  const { error } = await query;
-  
-  if (error) {
-    console.error("Error deleting time slots by date:", error);
-    throw error;
-  }
-};
-
-// Webhook Configuration API Functions
+// Function to fetch all webhook configurations
 export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration[]> => {
   const { data, error } = await supabase
     .from('webhook_configurations')
     .select('*');
 
   if (error) {
-    console.error("Error fetching webhook configurations:", error);
-    throw error;
+    console.error('Error fetching webhook configurations:', error);
+    throw new Error('Failed to fetch webhook configurations');
   }
 
   return data || [];
 };
 
-export const createWebhookConfiguration = async (webhookConfiguration: Omit<WebhookConfiguration, 'id' | 'created_at'>): Promise<WebhookConfiguration> => {
+// Function to fetch a single webhook configuration by ID
+export const fetchWebhookConfigurationById = async (id: string): Promise<WebhookConfiguration | null> => {
+  const { data, error } = await supabase
+    .from('webhook_configurations')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching webhook configuration:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to create a new webhook configuration
+export const createWebhookConfiguration = async (webhookConfiguration: Omit<WebhookConfiguration, 'id' | 'created_at'>): Promise<WebhookConfiguration | null> => {
   const { data, error } = await supabase
     .from('webhook_configurations')
     .insert([webhookConfiguration])
@@ -649,14 +542,15 @@ export const createWebhookConfiguration = async (webhookConfiguration: Omit<Webh
     .single();
 
   if (error) {
-    console.error("Error creating webhook configuration:", error);
-    throw error;
+    console.error('Error creating webhook configuration:', error);
+    return null;
   }
 
   return data;
 };
 
-export const updateWebhookConfiguration = async (id: string, updates: Partial<WebhookConfiguration>): Promise<WebhookConfiguration> => {
+// Function to update an existing webhook configuration
+export const updateWebhookConfiguration = async (id: string, updates: Partial<WebhookConfiguration>): Promise<WebhookConfiguration | null> => {
   const { data, error } = await supabase
     .from('webhook_configurations')
     .update(updates)
@@ -665,161 +559,227 @@ export const updateWebhookConfiguration = async (id: string, updates: Partial<We
     .single();
 
   if (error) {
-    console.error("Error updating webhook configuration:", error);
-    throw error;
+    console.error('Error updating webhook configuration:', error);
+    return null;
   }
 
   return data;
 };
 
-export const deleteWebhookConfiguration = async (id: string): Promise<void> => {
+// Function to delete a webhook configuration
+export const deleteWebhookConfiguration = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('webhook_configurations')
     .delete()
     .eq('id', id);
 
   if (error) {
-    console.error("Error deleting webhook configuration:", error);
-    throw error;
+    console.error('Error deleting webhook configuration:', error);
+    return false;
   }
+
+  return true;
 };
 
-export const testWebhook = async (id: string): Promise<any> => {
-  // This is a placeholder for the actual implementation
-  console.log(`Testing webhook with ID: ${id}`);
-  return { success: true, message: "Webhook test sent successfully" };
-};
-
-// Webhook Logs API Functions
-export const fetchWebhookLogs = async (): Promise<WebhookLog[]> => {
-  const { data, error } = await supabase
+// Function to fetch webhook logs with optional webhook_id filter
+export const fetchWebhookLogs = async (filters?: { queryKey: any }): Promise<any[]> => {
+  let query = supabase
     .from('webhook_logs')
     .select('*')
     .order('created_at', { ascending: false });
 
+  // Apply webhook_id filter if provided
+  if (filters && filters.queryKey && filters.queryKey[1]) {
+    const webhookId = filters.queryKey[1];
+    query = query.eq('webhook_id', webhookId);
+  }
+
+  const { data, error } = await query;
+
   if (error) {
-    console.error("Error fetching webhook logs:", error);
-    throw error;
+    console.error('Error fetching webhook logs:', error);
+    throw new Error('Failed to fetch webhook logs');
   }
 
   return data || [];
 };
 
-// Users API Functions
-export const fetchUsers = async (): Promise<User[]> => {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*');
-  
-  if (error) {
-    console.error("Error fetching users:", error);
-    throw error;
+// Function to test a webhook
+export const testWebhook = async (url: string, event_type: string, payload: any): Promise<any> => {
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Event-Type': event_type,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error('Webhook test failed:', response.status, response.statusText);
+      throw new Error(`Webhook test failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error testing webhook:', error);
+    throw new Error(`Failed to test webhook: ${error.message}`);
   }
-  
-  return (data || []).map(user => ({
-    ...user,
-    tipo_usuario: (user.tipo_usuario as "admin" | "superadmin") || "admin"
-  }));
 };
 
-export const fetchUserByAuthId = async (): Promise<User | null> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    console.error("No user session found.");
-    return null;
-  }
-  
+// Function to fetch company information
+export const fetchCompany = async (): Promise<Company | null> => {
   const { data, error } = await supabase
-    .from('users')
+    .from('company')
     .select('*')
-    .eq('auth_id', user.id)
     .single();
-  
-  if (error) {
-    console.error("Error fetching user by auth_id:", error);
-    throw error;
-  }
-  
-  return data ? {
-    ...data,
-    tipo_usuario: (data.tipo_usuario as "admin" | "superadmin") || "admin"
-  } : null;
-};
 
-// Company settings API Functions
-export const fetchCompanySettings = async () => {
-  const { data, error } = await supabase
-    .from('companies')
-    .select('*')
-    .limit(1)
-    .single();
-  
   if (error) {
-    console.error("Error fetching company settings:", error);
+    console.error('Error fetching company:', error);
     return null;
   }
-  
+
   return data;
 };
 
-export const updateCompanySettings = async (id: string, updates: any) => {
+// Function to update company information
+export const updateCompany = async (id: string, updates: Partial<Company>): Promise<Company | null> => {
   const { data, error } = await supabase
-    .from('companies')
+    .from('company')
     .update(updates)
     .eq('id', id)
     .select()
     .single();
-  
+
   if (error) {
-    console.error("Error updating company settings:", error);
-    throw error;
+    console.error('Error updating company:', error);
+    return null;
   }
-  
+
   return data;
 };
 
-export const createCompanySettings = async (settings: any) => {
+// Function to fetch all users
+export const fetchUsers = async (): Promise<User[]> => {
   const { data, error } = await supabase
-    .from('companies')
-    .insert([settings])
-    .select()
-    .single();
-  
+    .from('users')
+    .select('*');
+
   if (error) {
-    console.error("Error creating company settings:", error);
-    throw error;
+    console.error('Error fetching users:', error);
+    throw new Error('Failed to fetch users');
   }
-  
-  return data;
+
+  return data || [];
 };
 
-// SuperAdmin company management
-export const fetchCompanies = async () => {
+// Function to fetch a single user by ID
+export const fetchUserById = async (id: string): Promise<User | null> => {
   const { data, error } = await supabase
-    .from('companies')
+    .from('users')
     .select('*')
-    .order('created_at', { ascending: false });
-  
+    .eq('id', id)
+    .single();
+
   if (error) {
-    console.error("Error fetching companies:", error);
-    return [];
+    console.error('Error fetching user:', error);
+    return null;
   }
-  
+
   return data;
 };
 
-export const createCompany = async (company: any) => {
+// Function to create a new user
+export const createUser = async (user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User | null> => {
   const { data, error } = await supabase
-    .from('companies')
-    .insert([company])
+    .from('users')
+    .insert([user])
     .select()
     .single();
-  
+
   if (error) {
-    console.error("Error creating company:", error);
-    throw error;
+    console.error('Error creating user:', error);
+    return null;
   }
-  
+
   return data;
+};
+
+// Function to update an existing user
+export const updateUser = async (id: string, updates: Partial<User>): Promise<User | null> => {
+  const { data, error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating user:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to delete a user
+export const deleteUser = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting user:', error);
+    return false;
+  }
+
+  return true;
+};
+
+// Function to fetch all professional-service associations
+export const fetchProfessionalServicesAssociations = async (): Promise<ProfessionalService[]> => {
+  const { data, error } = await supabase
+    .from('professional_services')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching professional-service associations:', error);
+    throw new Error('Failed to fetch professional-service associations');
+  }
+
+  return data || [];
+};
+
+// Function to create a new professional-service association
+export const createProfessionalServiceAssociation = async (association: Omit<ProfessionalService, 'id'>): Promise<ProfessionalService | null> => {
+  const { data, error } = await supabase
+    .from('professional_services')
+    .insert([association])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating professional-service association:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to delete a professional-service association
+export const deleteProfessionalServiceAssociation = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('professional_services')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting professional-service association:', error);
+    return false;
+  }
+
+  return true;
 };

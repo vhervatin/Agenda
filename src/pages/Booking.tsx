@@ -20,7 +20,8 @@ import {
   fetchServiceProfessionals, 
   fetchAvailableSlots,
   createAppointment,
-  fetchConvenios
+  fetchConvenios,
+  fetchAvailableDates
 } from '@/services/api';
 import { Professional, Service, TimeSlot } from '@/types/types';
 
@@ -40,6 +41,7 @@ const Booking = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cpfIsValid, setCpfIsValid] = useState(true);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   
   const { 
     data: services = [], 
@@ -66,6 +68,24 @@ const Booking = () => {
     queryKey: ['convenios'],
     queryFn: fetchConvenios
   });
+
+  // Fetch available dates when professional and convênio are selected
+  useEffect(() => {
+    if (selectedProfessional && (selectedConvenio !== undefined)) {
+      fetchAvailableDates(selectedProfessional, selectedConvenio)
+        .then(dates => {
+          setAvailableDates(dates);
+          // If current selected date is not in available dates, reset it
+          if (selectedDate && !dates.includes(selectedDate.toISOString().split('T')[0])) {
+            setSelectedDate(null);
+          }
+        })
+        .catch(error => {
+          console.error("Error fetching available dates:", error);
+          toast.error("Não foi possível carregar as datas disponíveis");
+        });
+    }
+  }, [selectedProfessional, selectedConvenio]);
   
   useEffect(() => {
     if (selectedProfessional && selectedDate) {
@@ -83,10 +103,28 @@ const Booking = () => {
   }, [selectedProfessional, selectedDate, selectedConvenio]);
 
   useEffect(() => {
-    if (selectedProfessional) {
+    if (selectedService) {
       setSelectedProfessional(null);
+      setSelectedConvenio(null);
+      setSelectedDate(null);
+      setSelectedTimeSlot(null);
     }
   }, [selectedService]);
+  
+  useEffect(() => {
+    if (selectedProfessional) {
+      setSelectedConvenio(null);
+      setSelectedDate(null);
+      setSelectedTimeSlot(null);
+    }
+  }, [selectedProfessional]);
+
+  useEffect(() => {
+    if (selectedConvenio !== undefined) {
+      setSelectedDate(null);
+      setSelectedTimeSlot(null);
+    }
+  }, [selectedConvenio]);
   
   const selectedProfessionalObject = selectedProfessional 
     ? professionals.find(prof => prof.id === selectedProfessional) || null
@@ -196,7 +234,8 @@ const Booking = () => {
       client_phone: clientPhone,
       client_cpf: clientCpf,
       status: 'confirmed' as const,
-      appointment_date: selectedTimeObject.start_time || new Date().toISOString()
+      appointment_date: selectedTimeObject.start_time || new Date().toISOString(),
+      convenio_id: selectedConvenio
     };
     
     createAppointment(appointment)
@@ -352,10 +391,19 @@ const Booking = () => {
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha uma data</h2>
             <div className="max-w-md mx-auto">
-              <DatePicker
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-              />
+              {availableDates.length > 0 ? (
+                <DatePicker
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  availableDates={availableDates}
+                />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  {selectedProfessional && selectedConvenio !== undefined ? 
+                    "Nenhuma data disponível para este profissional e convênio." :
+                    "Selecione um profissional e convênio para ver as datas disponíveis."}
+                </div>
+              )}
             </div>
           </div>
         );
