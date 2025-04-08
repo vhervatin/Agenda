@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Service, Professional, TimeSlot, Appointment, Convenio, WebhookConfiguration, WebhookLog, Company, User, ProfessionalService } from '@/types/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -487,11 +486,28 @@ export const fetchAppointments = async (filters?: any): Promise<Appointment[]> =
     throw new Error('Failed to fetch appointments');
   }
 
-  const appointments = data.map(appointment => ({
-    ...appointment,
-    status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
-    convenio_nome: null // Initialize with null as we don't have direct access to convenio_nome
-  }));
+  // Transform the data to match the Appointment type
+  const appointments = data.map(appointment => {
+    // Transform slots data to match TimeSlot type
+    const slotData = appointment.slots || {};
+    const timeSlot: TimeSlot = {
+      id: slotData.id || '',
+      time: slotData.start_time ? new Date(slotData.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      available: !!slotData.is_available,
+      start_time: slotData.start_time || '',
+      end_time: slotData.end_time || '',
+      professional_id: slotData.professional_id,
+      convenio_id: slotData.convenio_id,
+      is_available: slotData.is_available
+    };
+
+    return {
+      ...appointment,
+      status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
+      convenio_nome: appointment.convenio_nome || null,
+      slots: timeSlot
+    } as Appointment;
+  });
 
   return appointments;
 };
@@ -516,11 +532,25 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
 
   if (!data) return null;
 
+  // Transform slots data to match TimeSlot type
+  const slotData = data.slots || {};
+  const timeSlot: TimeSlot = {
+    id: slotData.id || '',
+    time: slotData.start_time ? new Date(slotData.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+    available: !!slotData.is_available,
+    start_time: slotData.start_time || '',
+    end_time: slotData.end_time || '',
+    professional_id: slotData.professional_id,
+    convenio_id: slotData.convenio_id,
+    is_available: slotData.is_available
+  };
+
   return {
     ...data,
     status: data.status as 'confirmed' | 'cancelled' | 'completed',
-    convenio_nome: null
-  };
+    convenio_nome: null,
+    slots: timeSlot
+  } as Appointment;
 };
 
 // Function to fetch appointments by CPF
@@ -541,11 +571,28 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
     throw new Error('Failed to fetch appointments by CPF');
   }
 
-  const appointments = (data || []).map(appointment => ({
-    ...appointment,
-    status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
-    convenio_nome: null
-  }));
+  // Transform the data to match the Appointment type
+  const appointments = (data || []).map(appointment => {
+    // Transform slots data to match TimeSlot type
+    const slotData = appointment.slots || {};
+    const timeSlot: TimeSlot = {
+      id: slotData.id || '',
+      time: slotData.start_time ? new Date(slotData.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      available: !!slotData.is_available,
+      start_time: slotData.start_time || '',
+      end_time: slotData.end_time || '',
+      professional_id: slotData.professional_id,
+      convenio_id: slotData.convenio_id,
+      is_available: slotData.is_available
+    };
+
+    return {
+      ...appointment,
+      status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
+      convenio_nome: null,
+      slots: timeSlot
+    } as Appointment;
+  });
 
   return appointments;
 };
