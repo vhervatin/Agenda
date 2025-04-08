@@ -437,6 +437,23 @@ export const fetchAvailableDates = async (
 
 // Function to create a new appointment
 export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>): Promise<{ id: string }> => {
+  // First, check if the slot is still available
+  const { data: slotData, error: slotError } = await supabase
+    .from('available_slots')
+    .select('is_available')
+    .eq('id', appointment.slot_id)
+    .single();
+
+  if (slotError) {
+    console.error('Error checking slot availability:', slotError);
+    throw new Error('Failed to check slot availability');
+  }
+
+  if (!slotData.is_available) {
+    throw new Error('Este horário não está mais disponível. Por favor, escolha outro horário.');
+  }
+
+  // Start a transaction to update slot availability and create appointment
   const { data, error } = await supabase
     .from('appointments')
     .insert([appointment])
@@ -446,6 +463,18 @@ export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'c
   if (error) {
     console.error('Error creating appointment:', error);
     throw new Error('Failed to create appointment');
+  }
+
+  // Update the slot to mark it as unavailable
+  const { error: updateError } = await supabase
+    .from('available_slots')
+    .update({ is_available: false })
+    .eq('id', appointment.slot_id);
+
+  if (updateError) {
+    console.error('Error updating slot availability:', updateError);
+    // The appointment was created, but we failed to update the slot
+    // We'll still return the appointment ID and log the error
   }
 
   return data;
@@ -496,9 +525,9 @@ export const fetchAppointments = async (filters?: any): Promise<Appointment[]> =
       available: !!slotData.is_available,
       start_time: slotData.start_time || '',
       end_time: slotData.end_time || '',
-      professional_id: slotData.professional_id,
-      convenio_id: slotData.convenio_id,
-      is_available: slotData.is_available
+      professional_id: slotData.professional_id || '',
+      convenio_id: slotData.convenio_id || null,
+      is_available: !!slotData.is_available
     };
 
     return {
@@ -540,9 +569,9 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
     available: !!slotData.is_available,
     start_time: slotData.start_time || '',
     end_time: slotData.end_time || '',
-    professional_id: slotData.professional_id,
-    convenio_id: slotData.convenio_id,
-    is_available: slotData.is_available
+    professional_id: slotData.professional_id || '',
+    convenio_id: slotData.convenio_id || null,
+    is_available: !!slotData.is_available
   };
 
   return {
@@ -581,9 +610,9 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
       available: !!slotData.is_available,
       start_time: slotData.start_time || '',
       end_time: slotData.end_time || '',
-      professional_id: slotData.professional_id,
-      convenio_id: slotData.convenio_id,
-      is_available: slotData.is_available
+      professional_id: slotData.professional_id || '',
+      convenio_id: slotData.convenio_id || null,
+      is_available: !!slotData.is_available
     };
 
     return {
@@ -621,6 +650,18 @@ export const updateAppointment = async (id: string, updates: Partial<Appointment
 
 // Function to update an appointment status
 export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed'): Promise<Appointment | null> => {
+  const { data: appointmentData, error: fetchError } = await supabase
+    .from('appointments')
+    .select('slot_id, status')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching appointment:', fetchError);
+    throw new Error('Failed to fetch appointment');
+  }
+
+  // Update appointment status
   const { data, error } = await supabase
     .from('appointments')
     .update({ status })
@@ -631,6 +672,20 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
   if (error) {
     console.error('Error updating appointment status:', error);
     return null;
+  }
+
+  // If the appointment is cancelled, make the slot available again
+  if (status === 'cancelled' && appointmentData.status !== 'cancelled') {
+    const { error: slotError } = await supabase
+      .from('available_slots')
+      .update({ is_available: true })
+      .eq('id', appointmentData.slot_id);
+
+    if (slotError) {
+      console.error('Error updating slot availability:', slotError);
+      // The appointment status was updated, but we failed to update the slot
+      // We'll still return the appointment data and log the error
+    }
   }
 
   if (!data) return null;

@@ -23,6 +23,16 @@ const DatePicker: React.FC<DatePickerProps> = ({
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
+  useEffect(() => {
+    // If there are available dates, set the current month to the month of the first available date
+    if (availableDates.length > 0) {
+      const firstAvailableDate = new Date(availableDates[0]);
+      if (!isNaN(firstAvailableDate.getTime())) {
+        setCurrentMonth(firstAvailableDate);
+      }
+    }
+  }, [availableDates]);
+  
   const goToPreviousMonth = () => setCurrentMonth(prev => subMonths(prev, 1));
   const goToNextMonth = () => setCurrentMonth(prev => addMonths(prev, 1));
   
@@ -111,6 +121,8 @@ const DatePicker: React.FC<DatePickerProps> = ({
           const isSelected = selectedDate && isSameDay(day, selectedDate);
           const isDisabled = isDateDisabled(day);
           const isTodayDate = isToday(day);
+          const dateString = format(day, 'yyyy-MM-dd');
+          const isAvailable = availableDates.includes(dateString);
           
           return (
             <button
@@ -121,8 +133,10 @@ const DatePicker: React.FC<DatePickerProps> = ({
                 "calendar-day",
                 isSelected && "calendar-day-selected",
                 isDisabled && "calendar-day-disabled",
-                isTodayDate && !isSelected && "border border-primary/40"
+                isTodayDate && !isSelected && "border border-primary/40",
+                isAvailable && !isSelected && "bg-primary/10"
               )}
+              title={isAvailable ? "Horários disponíveis" : "Sem horários disponíveis"}
             >
               <span className="text-sm">{format(day, 'd')}</span>
             </button>

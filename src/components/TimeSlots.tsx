@@ -26,10 +26,15 @@ const TimeSlots: React.FC<TimeSlotsProps> = ({
   selectedSlot,
   onSelectTimeSlot
 }) => {
-  // Filter out past time slots if the date is today
+  // Filter out past time slots if the date is today and unavailable slots
   const currentTime = new Date();
   
   const filteredTimeSlots = timeSlots.filter(slot => {
+    // Skip unavailable slots
+    if (!slot.available || slot.is_available === false) {
+      return false;
+    }
+    
     if (!slot.start_time) return true;
     
     const slotTime = new Date(slot.start_time);

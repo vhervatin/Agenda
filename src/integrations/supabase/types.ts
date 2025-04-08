@@ -15,6 +15,7 @@ export type Database = {
           client_cpf: string | null
           client_name: string
           client_phone: string
+          convenio_id: string | null
           created_at: string | null
           id: string
           professional_id: string | null
@@ -28,6 +29,7 @@ export type Database = {
           client_cpf?: string | null
           client_name: string
           client_phone: string
+          convenio_id?: string | null
           created_at?: string | null
           id?: string
           professional_id?: string | null
@@ -41,6 +43,7 @@ export type Database = {
           client_cpf?: string | null
           client_name?: string
           client_phone?: string
+          convenio_id?: string | null
           created_at?: string | null
           id?: string
           professional_id?: string | null
