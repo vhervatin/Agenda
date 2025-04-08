@@ -355,7 +355,18 @@ export const createAvailableSlotsBulk = async (slots: Omit<TimeSlot, 'id' | 'tim
     throw new Error('Failed to create available slots');
   }
 
-  return data || [];
+  const formattedSlots = (data || []).map(slot => ({
+    id: slot.id,
+    time: new Date(slot.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    available: slot.is_available || false,
+    start_time: slot.start_time,
+    end_time: slot.end_time,
+    professional_id: slot.professional_id,
+    convenio_id: slot.convenio_id,
+    is_available: slot.is_available
+  }));
+
+  return formattedSlots;
 };
 
 // Function to delete an available slot by ID
@@ -449,8 +460,7 @@ export const fetchAppointments = async (filters?: any): Promise<Appointment[]> =
       *,
       professionals:professional_id (*),
       services:service_id (*),
-      slots:slot_id (*),
-      convenios:convenio_id (*)
+      slots:slot_id (*)
     `);
 
   // Apply filters if provided
@@ -477,10 +487,13 @@ export const fetchAppointments = async (filters?: any): Promise<Appointment[]> =
     throw new Error('Failed to fetch appointments');
   }
 
-  return data.map(appointment => ({
+  const appointments = data.map(appointment => ({
     ...appointment,
-    convenio_nome: appointment.convenios?.nome
-  })) || [];
+    status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
+    convenio_nome: null // Initialize with null as we don't have direct access to convenio_nome
+  }));
+
+  return appointments;
 };
 
 // Function to fetch an appointment by ID
@@ -491,8 +504,7 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       *,
       professionals:professional_id (*),
       services:service_id (*),
-      slots:slot_id (*),
-      convenios:convenio_id (*)
+      slots:slot_id (*)
     `)
     .eq('id', id)
     .single();
@@ -502,7 +514,13 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    status: data.status as 'confirmed' | 'cancelled' | 'completed',
+    convenio_nome: null
+  };
 };
 
 // Function to fetch appointments by CPF
@@ -513,8 +531,7 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
       *,
       professionals:professional_id (*),
       services:service_id (*),
-      slots:slot_id (*),
-      convenios:convenio_id (*)
+      slots:slot_id (*)
     `)
     .eq('client_cpf', cpf)
     .order('appointment_date', { ascending: true });
@@ -524,7 +541,13 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
     throw new Error('Failed to fetch appointments by CPF');
   }
 
-  return data || [];
+  const appointments = (data || []).map(appointment => ({
+    ...appointment,
+    status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
+    convenio_nome: null
+  }));
+
+  return appointments;
 };
 
 // Function to update an existing appointment
@@ -541,7 +564,12 @@ export const updateAppointment = async (id: string, updates: Partial<Appointment
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    status: data.status as 'confirmed' | 'cancelled' | 'completed'
+  };
 };
 
 // Function to update an appointment status
@@ -558,7 +586,12 @@ export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    status: data.status as 'confirmed' | 'cancelled' | 'completed'
+  };
 };
 
 // Function to delete an appointment
@@ -579,7 +612,7 @@ export const deleteAppointment = async (id: string): Promise<boolean> => {
 // Function to fetch company information
 export const fetchCompany = async (): Promise<Company | null> => {
   const { data, error } = await supabase
-    .from('company')
+    .from('companies')
     .select('*')
     .single();
 
@@ -592,7 +625,7 @@ export const fetchCompany = async (): Promise<Company | null> => {
 };
 
 // Function to fetch company settings
-export const fetchCompanySettings = async (): Promise<any> => {
+export const fetchCompanySettings = async (): Promise<Company | null> => {
   const { data, error } = await supabase
     .from('companies')
     .select('*')
@@ -607,7 +640,7 @@ export const fetchCompanySettings = async (): Promise<any> => {
 };
 
 // Function to create company settings
-export const createCompanySettings = async (settings: Partial<Company>): Promise<Company | null> => {
+export const createCompanySettings = async (settings: Omit<Company, 'id' | 'created_at' | 'updated_at'>): Promise<Company | null> => {
   const { data, error } = await supabase
     .from('companies')
     .insert([settings])
@@ -642,7 +675,7 @@ export const updateCompanySettings = async (id: string, updates: Partial<Company
 // Function to update company information
 export const updateCompany = async (id: string, updates: Partial<Company>): Promise<Company | null> => {
   const { data, error } = await supabase
-    .from('company')
+    .from('companies')
     .update(updates)
     .eq('id', id)
     .select()
@@ -667,7 +700,12 @@ export const fetchUsers = async (): Promise<User[]> => {
     throw new Error('Failed to fetch users');
   }
 
-  return data || [];
+  const users = (data || []).map(user => ({
+    ...user,
+    tipo_usuario: user.tipo_usuario as 'admin' | 'superadmin'
+  }));
+
+  return users;
 };
 
 // Function to fetch a single user by ID
@@ -683,7 +721,12 @@ export const fetchUserById = async (id: string): Promise<User | null> => {
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    tipo_usuario: data.tipo_usuario as 'admin' | 'superadmin'
+  };
 };
 
 // Function to fetch user by auth ID
@@ -705,7 +748,12 @@ export const fetchUserByAuthId = async (): Promise<User | null> => {
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    tipo_usuario: data.tipo_usuario as 'admin' | 'superadmin'
+  };
 };
 
 // Function to create a new user
@@ -721,7 +769,12 @@ export const createUser = async (user: Omit<User, 'id' | 'created_at' | 'updated
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    tipo_usuario: data.tipo_usuario as 'admin' | 'superadmin'
+  };
 };
 
 // Function to update an existing user
@@ -738,7 +791,12 @@ export const updateUser = async (id: string, updates: Partial<User>): Promise<Us
     return null;
   }
 
-  return data;
+  if (!data) return null;
+
+  return {
+    ...data,
+    tipo_usuario: data.tipo_usuario as 'admin' | 'superadmin'
+  };
 };
 
 // Function to delete a user

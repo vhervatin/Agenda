@@ -16,7 +16,7 @@ const formSchema = z.object({
   name: z.string().min(2, {
     message: 'O nome da empresa deve ter pelo menos 2 caracteres.',
   }),
-  logo_url: z.string().url({ message: 'Por favor, insira uma URL válida.' }).optional(),
+  logo_url: z.string().url({ message: 'Por favor, insira uma URL válida.' }).optional().nullable(),
   primary_color: z.string().regex(/^#([0-9A-Fa-f]{3}){1,2}$/, { message: 'Por favor, insira um código de cor hexadecimal válido.' }),
   secondary_color: z.string().regex(/^#([0-9A-Fa-f]{3}){1,2}$/, { message: 'Por favor, insira um código de cor hexadecimal válido.' }),
   slug: z.string().min(2, {
@@ -48,7 +48,13 @@ const Settings = () => {
         const settings = await fetchCompanySettings();
         if (settings) {
           setCompany(settings);
-          form.reset(settings);
+          form.reset({
+            name: settings.name,
+            logo_url: settings.logo_url || '',
+            primary_color: settings.primary_color,
+            secondary_color: settings.secondary_color,
+            slug: settings.slug
+          });
         }
       } catch (error) {
         console.error('Error fetching company settings:', error);
@@ -60,7 +66,6 @@ const Settings = () => {
     fetchSettings();
   }, [form, navigate]);
 
-  // Update the updateCompanySettings function call to pass both parameters
   const handleSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {

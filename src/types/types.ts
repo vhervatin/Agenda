@@ -1,4 +1,3 @@
-
 export interface Service {
   id: string;
   name: string;
@@ -33,9 +32,9 @@ export interface TimeSlot {
   end_time: string;
   professional_id?: string;
   is_available?: boolean;
-  convenio_id?: string;
-  convenio_nome?: string;
-  convenios?: Convenio;
+  convenio_id?: string | null;
+  convenio_nome?: string | null;
+  convenios?: Convenio | null;
 }
 
 export interface Appointment {
@@ -53,9 +52,9 @@ export interface Appointment {
   professionals?: Professional;
   services?: Service;
   slots?: TimeSlot;
-  convenio_id?: string;
-  convenio_nome?: string;
-  convenios?: Convenio;
+  convenio_id?: string | null;
+  convenio_nome?: string | null;
+  convenios?: Convenio | null;
 }
 
 export interface TimeRange {
@@ -93,12 +92,16 @@ export interface WebhookLog {
 export interface Company {
   id: string;
   name: string;
-  logo_url?: string;
+  logo_url?: string | null;
   primary_color: string;
   secondary_color: string;
   slug: string;
   created_at: string;
   updated_at: string;
+  plan?: string | null;
+  plan_expiry_date?: string | null;
+  plan_value?: number | null;
+  is_active?: boolean | null;
 }
 
 export interface User {
@@ -112,7 +115,6 @@ export interface User {
   updated_at: string;
 }
 
-// Add interface for professional-service association
 export interface ProfessionalService {
   id: string;
   professional_id: string;
