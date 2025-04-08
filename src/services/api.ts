@@ -1,10 +1,7 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Service, Professional, TimeSlot, Appointment, Convenio, WebhookConfiguration, WebhookLog, Company, User, ProfessionalService } from '@/types/types';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '@/integrations/supabase/client';
 
 // Function to fetch all services
 export const fetchServices = async (): Promise<Service[]> => {
@@ -877,6 +874,38 @@ export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration
   }
 
   return data || [];
+};
+
+// Add missing webhook functions that were causing errors
+export const createWebhookConfiguration = async (webhookConfig: Omit<WebhookConfiguration, 'id' | 'created_at'>): Promise<WebhookConfiguration | null> => {
+  const { data, error } = await supabase
+    .from('webhook_configurations')
+    .insert([webhookConfig])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating webhook configuration:', error);
+    return null;
+  }
+
+  return data;
+};
+
+export const updateWebhookConfiguration = async (id: string, updates: Partial<WebhookConfiguration>): Promise<WebhookConfiguration | null> => {
+  const { data, error } = await supabase
+    .from('webhook_configurations')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating webhook configuration:', error);
+    return null;
+  }
+
+  return data;
 };
 
 // Function to fetch webhook logs
