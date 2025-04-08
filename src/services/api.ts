@@ -6,6 +6,21 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Function to fetch all services
+export const fetchServices = async (): Promise<Service[]> => {
+  const { data, error } = await supabase
+    .from('services')
+    .select('*')
+    .eq('active', true);
+
+  if (error) {
+    console.error('Error fetching services:', error);
+    throw new Error('Failed to fetch services');
+  }
+
+  return data || [];
+};
+
 // Function to fetch the professional services
 export const fetchProfessionalServices = async (): Promise<Service[]> => {
   const { data, error } = await supabase
@@ -471,6 +486,50 @@ export const fetchAppointments = async (filters?: any): Promise<Appointment[]> =
   })) || [];
 };
 
+// Function to fetch an appointment by ID
+export const fetchAppointmentById = async (id: string): Promise<Appointment | null> => {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select(`
+      *,
+      professionals:professional_id (*),
+      services:service_id (*),
+      slots:slot_id (*),
+      convenios:convenio_id (*)
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching appointment:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to fetch appointments by CPF
+export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]> => {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select(`
+      *,
+      professionals:professional_id (*),
+      services:service_id (*),
+      slots:slot_id (*),
+      convenios:convenio_id (*)
+    `)
+    .eq('client_cpf', cpf)
+    .order('appointment_date', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching appointments by CPF:', error);
+    throw new Error('Failed to fetch appointments by CPF');
+  }
+
+  return data || [];
+};
+
 // Function to update an existing appointment
 export const updateAppointment = async (id: string, updates: Partial<Appointment>): Promise<Appointment | null> => {
   const { data, error } = await supabase
@@ -482,6 +541,23 @@ export const updateAppointment = async (id: string, updates: Partial<Appointment
 
   if (error) {
     console.error('Error updating appointment:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to update an appointment status
+export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed'): Promise<Appointment | null> => {
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating appointment status:', error);
     return null;
   }
 
@@ -503,132 +579,6 @@ export const deleteAppointment = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// Function to fetch all webhook configurations
-export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration[]> => {
-  const { data, error } = await supabase
-    .from('webhook_configurations')
-    .select('*');
-
-  if (error) {
-    console.error('Error fetching webhook configurations:', error);
-    throw new Error('Failed to fetch webhook configurations');
-  }
-
-  return data || [];
-};
-
-// Function to fetch a single webhook configuration by ID
-export const fetchWebhookConfigurationById = async (id: string): Promise<WebhookConfiguration | null> => {
-  const { data, error } = await supabase
-    .from('webhook_configurations')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching webhook configuration:', error);
-    return null;
-  }
-
-  return data;
-};
-
-// Function to create a new webhook configuration
-export const createWebhookConfiguration = async (webhookConfiguration: Omit<WebhookConfiguration, 'id' | 'created_at'>): Promise<WebhookConfiguration | null> => {
-  const { data, error } = await supabase
-    .from('webhook_configurations')
-    .insert([webhookConfiguration])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating webhook configuration:', error);
-    return null;
-  }
-
-  return data;
-};
-
-// Function to update an existing webhook configuration
-export const updateWebhookConfiguration = async (id: string, updates: Partial<WebhookConfiguration>): Promise<WebhookConfiguration | null> => {
-  const { data, error } = await supabase
-    .from('webhook_configurations')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error updating webhook configuration:', error);
-    return null;
-  }
-
-  return data;
-};
-
-// Function to delete a webhook configuration
-export const deleteWebhookConfiguration = async (id: string): Promise<boolean> => {
-  const { error } = await supabase
-    .from('webhook_configurations')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting webhook configuration:', error);
-    return false;
-  }
-
-  return true;
-};
-
-// Function to fetch webhook logs with optional webhook_id filter
-export const fetchWebhookLogs = async (filters?: { queryKey: any }): Promise<any[]> => {
-  let query = supabase
-    .from('webhook_logs')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  // Apply webhook_id filter if provided
-  if (filters && filters.queryKey && filters.queryKey[1]) {
-    const webhookId = filters.queryKey[1];
-    query = query.eq('webhook_id', webhookId);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching webhook logs:', error);
-    throw new Error('Failed to fetch webhook logs');
-  }
-
-  return data || [];
-};
-
-// Function to test a webhook
-export const testWebhook = async (url: string, event_type: string, payload: any): Promise<any> => {
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Event-Type': event_type,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      console.error('Webhook test failed:', response.status, response.statusText);
-      throw new Error(`Webhook test failed with status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error testing webhook:', error);
-    throw new Error(`Failed to test webhook: ${error.message}`);
-  }
-};
-
 // Function to fetch company information
 export const fetchCompany = async (): Promise<Company | null> => {
   const { data, error } = await supabase
@@ -638,6 +588,54 @@ export const fetchCompany = async (): Promise<Company | null> => {
 
   if (error) {
     console.error('Error fetching company:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to fetch company settings
+export const fetchCompanySettings = async (): Promise<any> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('Error fetching company settings:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to create company settings
+export const createCompanySettings = async (settings: Partial<Company>): Promise<Company | null> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .insert([settings])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating company settings:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to update company settings
+export const updateCompanySettings = async (id: string, updates: Partial<Company>): Promise<Company | null> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating company settings:', error);
     return null;
   }
 
@@ -685,6 +683,28 @@ export const fetchUserById = async (id: string): Promise<User | null> => {
 
   if (error) {
     console.error('Error fetching user:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to fetch user by auth ID
+export const fetchUserByAuthId = async (): Promise<User | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    return null;
+  }
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('auth_id', session.user.id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user by auth ID:', error);
     return null;
   }
 
@@ -739,6 +759,67 @@ export const deleteUser = async (id: string): Promise<boolean> => {
   return true;
 };
 
+// Function to fetch all companies
+export const fetchCompanies = async (): Promise<Company[]> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching companies:', error);
+    throw new Error('Failed to fetch companies');
+  }
+
+  return data || [];
+};
+
+// Function to create a new company
+export const createCompany = async (company: Omit<Company, 'id' | 'created_at' | 'updated_at'>): Promise<Company | null> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .insert([company])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating company:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Function to associate a professional with a service
+export const associateProfessionalService = async (professionalId: string, serviceId: string): Promise<ProfessionalService | null> => {
+  const { data, error } = await supabase
+    .from('professional_services')
+    .insert([{ professional_id: professionalId, service_id: serviceId }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error associating professional to service:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+// Function to dissociate a professional from a service
+export const dissociateProfessionalService = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('professional_services')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error dissociating professional from service:', error);
+    return false;
+  }
+
+  return true;
+};
+
 // Function to fetch all professional-service associations
 export const fetchProfessionalServicesAssociations = async (): Promise<ProfessionalService[]> => {
   const { data, error } = await supabase
@@ -782,4 +863,66 @@ export const deleteProfessionalServiceAssociation = async (id: string): Promise<
   }
 
   return true;
+};
+
+// Function to fetch webhook configurations
+export const fetchWebhookConfigurations = async (): Promise<WebhookConfiguration[]> => {
+  const { data, error } = await supabase
+    .from('webhook_configurations')
+    .select('*');
+
+  if (error) {
+    console.error('Error fetching webhook configurations:', error);
+    throw new Error('Failed to fetch webhook configurations');
+  }
+
+  return data || [];
+};
+
+// Function to fetch webhook logs
+export const fetchWebhookLogs = async (filters?: { queryKey: any }): Promise<any[]> => {
+  let query = supabase
+    .from('webhook_logs')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  // Apply webhook_id filter if provided
+  if (filters && filters.queryKey && filters.queryKey[1]) {
+    const webhookId = filters.queryKey[1];
+    query = query.eq('webhook_id', webhookId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error fetching webhook logs:', error);
+    throw new Error('Failed to fetch webhook logs');
+  }
+
+  return data || [];
+};
+
+// Function to test a webhook
+export const testWebhook = async (url: string, event_type: string, payload: any): Promise<any> => {
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Event-Type': event_type,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error('Webhook test failed:', response.status, response.statusText);
+      throw new Error(`Webhook test failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error testing webhook:', error);
+    throw new Error(`Failed to test webhook: ${error.message}`);
+  }
 };
