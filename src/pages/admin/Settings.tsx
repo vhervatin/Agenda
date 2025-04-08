@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Link } from 'react-router-dom';
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -140,6 +140,9 @@ const Settings: React.FC<SettingsProps> = () => {
               {!companySettings && (
                 <AlertTriangle className="ml-1 h-4 w-4" />
               )}
+            </TabsTrigger>
+            <TabsTrigger value="convenios" className="flex-1">
+              Convênios
             </TabsTrigger>
           </TabsList>
           
@@ -284,6 +287,29 @@ const Settings: React.FC<SettingsProps> = () => {
                     </form>
                   </Form>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="convenios" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Convênios</CardTitle>
+                <CardDescription>
+                  Gerencie os convênios disponíveis para agendamentos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <Link to="/admin/convenios">
+                    <Button className="w-full md:w-auto">
+                      Acessar Gerenciamento de Convênios
+                    </Button>
+                  </Link>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  Utilize esta área para cadastrar, editar e excluir convênios que serão usados na agenda.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>

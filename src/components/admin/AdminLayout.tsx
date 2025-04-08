@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -11,7 +10,8 @@ import {
   LogOut,
   Menu,
   X,
-  Webhook
+  Webhook,
+  FileHeart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -89,6 +89,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       href: '/admin/appointments',
       icon: <CalendarClock className="h-5 w-5" />,
       text: 'Agendamentos'
+    },
+    {
+      href: '/admin/convenios',
+      icon: <FileHeart className="h-5 w-5" />,
+      text: 'Convênios'
     },
     {
       href: '/admin/integrations',

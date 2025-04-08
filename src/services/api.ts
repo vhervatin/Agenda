@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Service, Professional, Appointment, TimeSlot, WebhookConfiguration, WebhookLog, User, Convenio, ProfessionalService } from "@/types/types";
 
@@ -250,10 +249,18 @@ export const fetchAppointments = async (filter: { status?: string } = {}): Promi
     throw error;
   }
 
-  // Ensure status is one of the allowed values in the Appointment type
+  // Transform the data to include the required TimeSlot properties
   return (data || []).map(item => ({
     ...item,
-    status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed"
+    status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed",
+    slots: item.slots ? {
+      ...item.slots,
+      time: new Date(item.slots.start_time).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      available: Boolean(item.slots.is_available)
+    } : undefined
   }));
 };
 
@@ -278,9 +285,18 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
     throw error;
   }
 
+  // Transform to include required TimeSlot properties
   return {
     ...data,
-    status: (data.status as "confirmed" | "cancelled" | "completed") || "confirmed"
+    status: (data.status as "confirmed" | "cancelled" | "completed") || "confirmed",
+    slots: data.slots ? {
+      ...data.slots,
+      time: new Date(data.slots.start_time).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      available: Boolean(data.slots.is_available)
+    } : undefined
   };
 };
 
@@ -301,9 +317,18 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
     throw error;
   }
 
+  // Transform to include required TimeSlot properties
   return (data || []).map(item => ({
     ...item,
-    status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed"
+    status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed",
+    slots: item.slots ? {
+      ...item.slots,
+      time: new Date(item.slots.start_time).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      available: Boolean(item.slots.is_available)
+    } : undefined
   }));
 };
 
