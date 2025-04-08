@@ -227,19 +227,32 @@ export const deleteProfessional = async (id: string): Promise<void> => {
 };
 
 // Appointments API Functions
-export const fetchAppointments = async (filter: { status?: string } = {}): Promise<Appointment[]> => {
+export const fetchAppointments = async ({ queryKey }: { queryKey: [string, string?] }): Promise<Appointment[]> => {
+  const [_, date] = queryKey;
+  
   let query = supabase
     .from('appointments')
     .select(`
       *,
       professionals (*),
       services (*),
-      slots:available_slots (*)
+      slots:available_slots (
+        *,
+        convenios(*)
+      )
     `)
     .order('created_at', { ascending: false });
 
-  if (filter.status) {
-    query = query.eq('status', filter.status);
+  if (date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    query = query
+      .gte('appointment_date', startOfDay.toISOString())
+      .lte('appointment_date', endOfDay.toISOString());
   }
 
   const { data, error } = await query;
@@ -253,13 +266,17 @@ export const fetchAppointments = async (filter: { status?: string } = {}): Promi
   return (data || []).map(item => ({
     ...item,
     status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed",
+    convenio_id: item.slots?.convenio_id,
+    convenio_nome: item.slots?.convenios?.nome,
     slots: item.slots ? {
       ...item.slots,
       time: new Date(item.slots.start_time).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      available: Boolean(item.slots.is_available)
+      available: Boolean(item.slots.is_available),
+      convenio_id: item.slots.convenio_id,
+      convenio_nome: item.slots.convenios?.nome
     } : undefined
   }));
 };
@@ -271,7 +288,10 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       *,
       professionals (*),
       services (*),
-      slots:available_slots (*)
+      slots:available_slots (
+        *,
+        convenios(*)
+      )
     `)
     .eq('id', id)
     .single();
@@ -289,13 +309,17 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
   return {
     ...data,
     status: (data.status as "confirmed" | "cancelled" | "completed") || "confirmed",
+    convenio_id: data.slots?.convenio_id,
+    convenio_nome: data.slots?.convenios?.nome,
     slots: data.slots ? {
       ...data.slots,
       time: new Date(data.slots.start_time).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      available: Boolean(data.slots.is_available)
+      available: Boolean(data.slots.is_available),
+      convenio_id: data.slots.convenio_id,
+      convenio_nome: data.slots.convenios?.nome
     } : undefined
   };
 };
@@ -307,7 +331,10 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
       *,
       professionals (*),
       services (*),
-      slots:available_slots (*)
+      slots:available_slots (
+        *,
+        convenios(*)
+      )
     `)
     .eq('client_cpf', cpf)
     .order('created_at', { ascending: false });
@@ -321,13 +348,17 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
   return (data || []).map(item => ({
     ...item,
     status: (item.status as "confirmed" | "cancelled" | "completed") || "confirmed",
+    convenio_id: item.slots?.convenio_id,
+    convenio_nome: item.slots?.convenios?.nome,
     slots: item.slots ? {
       ...item.slots,
       time: new Date(item.slots.start_time).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      available: Boolean(item.slots.is_available)
+      available: Boolean(item.slots.is_available),
+      convenio_id: item.slots.convenio_id,
+      convenio_nome: item.slots.convenios?.nome
     } : undefined
   }));
 };

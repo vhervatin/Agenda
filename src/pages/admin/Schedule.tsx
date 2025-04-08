@@ -13,10 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Trash2, Calendar as CalendarIcon, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Trash2, Calendar as CalendarIcon, X, Filter } from 'lucide-react';
 import ScheduleForm from '@/components/admin/ScheduleForm';
-import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments, fetchProfessionals, deleteAvailableSlot, deleteAvailableSlotsByDate } from '@/services/api';
-import { TimeRange, TimeSlot } from '@/types/types';
+import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments, fetchProfessionals, deleteAvailableSlot, deleteAvailableSlotsByDate, fetchConvenios } from '@/services/api';
+import { TimeRange, TimeSlot, Convenio } from '@/types/types';
 import { ptBR } from 'date-fns/locale';
 
 // Interface para os slots locais
@@ -50,6 +52,7 @@ const Schedule = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotDuration, setSlotDuration] = useState(30);
+  const [convenioFilter, setConvenioFilter] = useState<string | null>(null);
   
   const [professionalId, setProfessionalId] = useState('');
   const [dateRange, setDateRange] = useState<Date[]>([]);
@@ -69,17 +72,23 @@ const Schedule = () => {
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
+
+  // Fetch convenios for filtering
+  const { data: convenios = [] } = useQuery({
+    queryKey: ['convenios'],
+    queryFn: fetchConvenios
+  });
   
   const { data: availableSlotsData = [], isLoading: isLoadingAvailableSlots, refetch: refetchSlots } = useQuery({
-    queryKey: ['availableSlots', formattedDate],
+    queryKey: ['availableSlots', formattedDate, convenioFilter],
     queryFn: () => fetchAvailableSlots(formattedDate),
     enabled: !!formattedDate
   });
   
   useEffect(() => {
     if (availableSlotsData) {
-      // Converta TimeSlot[] para Slot[]
-      const convertedSlots: Slot[] = availableSlotsData.map(slot => ({
+      // Converta TimeSlot[] para Slot[] e aplique filtro por convênio se necessário
+      let convertedSlots: Slot[] = availableSlotsData.map(slot => ({
         id: slot.id,
         start_time: slot.start_time || '',
         end_time: slot.end_time || '',
@@ -87,9 +96,19 @@ const Schedule = () => {
         convenio_id: slot.convenio_id,
         convenio_nome: slot.convenio_nome
       }));
+
+      // Aplicar filtro por convênio se estiver selecionado
+      if (convenioFilter) {
+        convertedSlots = convertedSlots.filter(slot => 
+          convenioFilter === 'none' 
+            ? !slot.convenio_id 
+            : slot.convenio_id === convenioFilter
+        );
+      }
+      
       setSlots(convertedSlots);
     }
-  }, [availableSlotsData]);
+  }, [availableSlotsData, convenioFilter]);
   
   const createSlotsMutation = useMutation({
     mutationFn: createAvailableSlotsBulk,
@@ -154,6 +173,10 @@ const Schedule = () => {
     setSelectedConvenioId(newConvenioId);
   };
 
+  const handleConvenioFilterChange = (value: string) => {
+    setConvenioFilter(value === 'all' ? null : value);
+  };
+
   const handleSlotDurationChange = (duration: number) => {
     setSlotDuration(duration);
   };
@@ -206,9 +229,8 @@ const Schedule = () => {
   };
   
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery({
-    queryKey: ['appointments', { date: formattedDate }],
-    queryFn: () => fetchAppointments({ queryKey: ['appointments', { date: formattedDate }] }),
-    enabled: !!formattedDate
+    queryKey: ['appointments', formattedDate],
+    queryFn: () => fetchAppointments({ date: formattedDate })
   });
   
   const availableSlots = slots.filter(slot => slot.is_available);
@@ -248,7 +270,7 @@ const Schedule = () => {
         
         <Card>
           <CardContent className="grid gap-6 md:grid-cols-2 p-4 md:p-6">
-            <div className="w-full flex justify-center">
+            <div className="w-full flex flex-col gap-4">
               <div className="w-full max-w-[300px] border rounded-md overflow-hidden">
                 <Calendar
                   mode="single"
@@ -257,6 +279,27 @@ const Schedule = () => {
                   locale={ptBR}
                   className="border-0"
                 />
+              </div>
+              
+              <div className="w-full max-w-[300px]">
+                <Label htmlFor="convenio-filter" className="mb-2 block">Filtrar por convênio</Label>
+                <Select
+                  value={convenioFilter === null ? 'all' : convenioFilter}
+                  onValueChange={handleConvenioFilterChange}
+                >
+                  <SelectTrigger id="convenio-filter" className="w-full">
+                    <SelectValue placeholder="Filtrar por convênio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os convênios</SelectItem>
+                    <SelectItem value="none">Sem convênio (Particular)</SelectItem>
+                    {convenios.map((convenio) => (
+                      <SelectItem key={convenio.id} value={convenio.id}>
+                        {convenio.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             
@@ -310,7 +353,7 @@ const Schedule = () => {
                               <Badge variant="outline">Disponível</Badge>
                             </TableCell>
                             <TableCell>
-                              {slot.convenio_nome || 'Sem convênio'}
+                              {slot.convenio_nome || 'Particular'}
                             </TableCell>
                             <TableCell className="text-right">
                               <Button 
@@ -333,8 +376,7 @@ const Schedule = () => {
                               <Badge variant="secondary">Agendado</Badge>
                             </TableCell>
                             <TableCell>
-                              {/* Convenio info not available in appointments */}
-                              -
+                              {appointment.convenio_nome || 'Particular'}
                             </TableCell>
                             <TableCell className="text-right">
                               {/* Ações indisponíveis para slots agendados */}
