@@ -570,18 +570,19 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
         convenio_id: appointment.convenio_id,
-        convenio_nome: convenio.nome,
+        convenio_nome: convenio && typeof convenio === 'object' && 'nome' in convenio ? convenio.nome : null,
         professionals: appointment.professionals,
         services: appointment.services,
         slots: {
-          id: slot.id || '',
-          time: slot.start_time ? format(new Date(slot.start_time), 'HH:mm') : '',
+          id: slot && typeof slot === 'object' && 'id' in slot ? slot.id : '',
+          time: slot && typeof slot === 'object' && 'start_time' in slot ? 
+            format(new Date(slot.start_time as string), 'HH:mm') : '',
           available: false, // Already booked
-          start_time: slot.start_time || '',
-          end_time: slot.end_time || '',
-          professional_id: slot.professional_id || '',
-          convenio_id: slot.convenio_id,
-          is_available: slot.is_available || false
+          start_time: slot && typeof slot === 'object' && 'start_time' in slot ? slot.start_time as string : '',
+          end_time: slot && typeof slot === 'object' && 'end_time' in slot ? slot.end_time as string : '',
+          professional_id: slot && typeof slot === 'object' && 'professional_id' in slot ? slot.professional_id as string : '',
+          convenio_id: slot && typeof slot === 'object' && 'convenio_id' in slot ? slot.convenio_id as string | null : null,
+          is_available: slot && typeof slot === 'object' && 'is_available' in slot ? slot.is_available as boolean : false
         }
       };
     });
@@ -632,18 +633,19 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       updated_at: data.updated_at || '',
       appointment_date: data.appointment_date || '',
       convenio_id: data.convenio_id,
-      convenio_nome: convenio.nome,
+      convenio_nome: convenio && typeof convenio === 'object' && 'nome' in convenio ? convenio.nome : null,
       professionals: data.professionals,
       services: data.services,
       slots: {
-        id: slot.id || '',
-        time: slot.start_time ? format(new Date(slot.start_time), 'HH:mm') : '',
+        id: slot && typeof slot === 'object' && 'id' in slot ? slot.id : '',
+        time: slot && typeof slot === 'object' && 'start_time' in slot ? 
+          format(new Date(slot.start_time as string), 'HH:mm') : '',
         available: false, // Already booked
-        start_time: slot.start_time || '',
-        end_time: slot.end_time || '',
-        professional_id: slot.professional_id || '',
-        convenio_id: slot.convenio_id,
-        is_available: slot.is_available || false
+        start_time: slot && typeof slot === 'object' && 'start_time' in slot ? slot.start_time as string : '',
+        end_time: slot && typeof slot === 'object' && 'end_time' in slot ? slot.end_time as string : '',
+        professional_id: slot && typeof slot === 'object' && 'professional_id' in slot ? slot.professional_id as string : '',
+        convenio_id: slot && typeof slot === 'object' && 'convenio_id' in slot ? slot.convenio_id as string | null : null,
+        is_available: slot && typeof slot === 'object' && 'is_available' in slot ? slot.is_available as boolean : false
       }
     };
   } catch (error) {
@@ -691,18 +693,19 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
         convenio_id: appointment.convenio_id,
-        convenio_nome: convenio.nome,
+        convenio_nome: convenio && typeof convenio === 'object' && 'nome' in convenio ? convenio.nome : null,
         professionals: appointment.professionals,
         services: appointment.services,
         slots: {
-          id: slot.id || '',
-          time: slot.start_time ? format(new Date(slot.start_time), 'HH:mm') : '',
+          id: slot && typeof slot === 'object' && 'id' in slot ? slot.id : '',
+          time: slot && typeof slot === 'object' && 'start_time' in slot ? 
+            format(new Date(slot.start_time as string), 'HH:mm') : '',
           available: false, // Already booked
-          start_time: slot.start_time || '',
-          end_time: slot.end_time || '',
-          professional_id: slot.professional_id || '',
-          convenio_id: slot.convenio_id,
-          is_available: slot.is_available || false
+          start_time: slot && typeof slot === 'object' && 'start_time' in slot ? slot.start_time as string : '',
+          end_time: slot && typeof slot === 'object' && 'end_time' in slot ? slot.end_time as string : '',
+          professional_id: slot && typeof slot === 'object' && 'professional_id' in slot ? slot.professional_id as string : '',
+          convenio_id: slot && typeof slot === 'object' && 'convenio_id' in slot ? slot.convenio_id as string | null : null,
+          is_available: slot && typeof slot === 'object' && 'is_available' in slot ? slot.is_available as boolean : false
         }
       };
     });
