@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Service, Professional, TimeSlot, Appointment, Convenio, WebhookConfiguration, WebhookLog, Company, User, ProfessionalService } from '@/types/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -336,6 +337,7 @@ export const fetchAvailableSlots = async (
     // Transform the data to match TimeSlot interface
     return data.map(slot => {
       const startTime = new Date(slot.start_time);
+      const convenioData = slot.convenios as Convenio | null;
       
       return {
         id: slot.id,
@@ -345,7 +347,7 @@ export const fetchAvailableSlots = async (
         end_time: slot.end_time,
         professional_id: slot.professional_id,
         convenio_id: slot.convenio_id,
-        convenio_nome: slot.convenios?.nome,
+        convenio_nome: convenioData?.nome,
         is_available: slot.is_available
       };
     });
@@ -555,7 +557,23 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
     // Transform the data to match the Appointment interface
     return data.map(appointment => {
       const slot = appointment.slots || {};
-      const convenio = appointment.convenios || {};
+      const convenio = appointment.convenios || null;
+      
+      const convenioNome = convenio && typeof convenio === 'object' && 'nome' in convenio ? 
+        convenio.nome as string : null;
+        
+      const slotData: TimeSlot = {
+        id: typeof slot === 'object' && slot !== null && 'id' in slot ? String(slot.id) : '',
+        time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? 
+          format(new Date(String(slot.start_time)), 'HH:mm') : '',
+        available: false, // Already booked
+        start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
+        end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
+        professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
+        convenio_id: typeof slot === 'object' && slot !== null && 'convenio_id' in slot ? 
+          (slot.convenio_id !== null ? String(slot.convenio_id) : null) : null,
+        is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
+      };
       
       return {
         id: appointment.id,
@@ -570,20 +588,10 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
         convenio_id: appointment.convenio_id,
-        convenio_nome: convenio && typeof convenio === 'object' && 'nome' in convenio ? convenio.nome : null,
+        convenio_nome: convenioNome,
         professionals: appointment.professionals,
         services: appointment.services,
-        slots: {
-          id: slot && typeof slot === 'object' && 'id' in slot ? slot.id : '',
-          time: slot && typeof slot === 'object' && 'start_time' in slot ? 
-            format(new Date(slot.start_time as string), 'HH:mm') : '',
-          available: false, // Already booked
-          start_time: slot && typeof slot === 'object' && 'start_time' in slot ? slot.start_time as string : '',
-          end_time: slot && typeof slot === 'object' && 'end_time' in slot ? slot.end_time as string : '',
-          professional_id: slot && typeof slot === 'object' && 'professional_id' in slot ? slot.professional_id as string : '',
-          convenio_id: slot && typeof slot === 'object' && 'convenio_id' in slot ? slot.convenio_id as string | null : null,
-          is_available: slot && typeof slot === 'object' && 'is_available' in slot ? slot.is_available as boolean : false
-        }
+        slots: slotData
       };
     });
   } catch (error) {
@@ -618,7 +626,22 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
     if (!data) return null;
     
     const slot = data.slots || {};
-    const convenio = data.convenios || {};
+    const convenio = data.convenios || null;
+    const convenioNome = convenio && typeof convenio === 'object' && 'nome' in convenio ? 
+      convenio.nome as string : null;
+    
+    const slotData: TimeSlot = {
+      id: typeof slot === 'object' && slot !== null && 'id' in slot ? String(slot.id) : '',
+      time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? 
+        format(new Date(String(slot.start_time)), 'HH:mm') : '',
+      available: false, // Already booked
+      start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
+      end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
+      professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
+      convenio_id: typeof slot === 'object' && slot !== null && 'convenio_id' in slot ? 
+        (slot.convenio_id !== null ? String(slot.convenio_id) : null) : null,
+      is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
+    };
     
     return {
       id: data.id,
@@ -633,20 +656,10 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       updated_at: data.updated_at || '',
       appointment_date: data.appointment_date || '',
       convenio_id: data.convenio_id,
-      convenio_nome: convenio && typeof convenio === 'object' && 'nome' in convenio ? convenio.nome : null,
+      convenio_nome: convenioNome,
       professionals: data.professionals,
       services: data.services,
-      slots: {
-        id: slot && typeof slot === 'object' && 'id' in slot ? slot.id : '',
-        time: slot && typeof slot === 'object' && 'start_time' in slot ? 
-          format(new Date(slot.start_time as string), 'HH:mm') : '',
-        available: false, // Already booked
-        start_time: slot && typeof slot === 'object' && 'start_time' in slot ? slot.start_time as string : '',
-        end_time: slot && typeof slot === 'object' && 'end_time' in slot ? slot.end_time as string : '',
-        professional_id: slot && typeof slot === 'object' && 'professional_id' in slot ? slot.professional_id as string : '',
-        convenio_id: slot && typeof slot === 'object' && 'convenio_id' in slot ? slot.convenio_id as string | null : null,
-        is_available: slot && typeof slot === 'object' && 'is_available' in slot ? slot.is_available as boolean : false
-      }
+      slots: slotData
     };
   } catch (error) {
     console.error('Error in fetchAppointmentById:', error);
@@ -662,8 +675,7 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
         *,
         professionals(*),
         services(*),
-        slots:available_slots(*),
-        convenios(*)
+        slots:available_slots(*)
       `)
       .eq('client_cpf', cpf)
       .order('appointment_date', { ascending: false });
@@ -678,7 +690,19 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
     // Transform the data to match the Appointment interface
     return data.map(appointment => {
       const slot = appointment.slots || {};
-      const convenio = appointment.convenios || {};
+      
+      const slotData: TimeSlot = {
+        id: typeof slot === 'object' && slot !== null && 'id' in slot ? String(slot.id) : '',
+        time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? 
+          format(new Date(String(slot.start_time)), 'HH:mm') : '',
+        available: false, // Already booked
+        start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
+        end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
+        professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
+        convenio_id: typeof slot === 'object' && slot !== null && 'convenio_id' in slot ? 
+          (slot.convenio_id !== null ? String(slot.convenio_id) : null) : null,
+        is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
+      };
       
       return {
         id: appointment.id,
@@ -693,20 +717,11 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
         convenio_id: appointment.convenio_id,
-        convenio_nome: convenio && typeof convenio === 'object' && 'nome' in convenio ? convenio.nome : null,
+        convenio_nome: appointment.convenio_nome || null,
         professionals: appointment.professionals,
         services: appointment.services,
-        slots: {
-          id: slot && typeof slot === 'object' && 'id' in slot ? slot.id : '',
-          time: slot && typeof slot === 'object' && 'start_time' in slot ? 
-            format(new Date(slot.start_time as string), 'HH:mm') : '',
-          available: false, // Already booked
-          start_time: slot && typeof slot === 'object' && 'start_time' in slot ? slot.start_time as string : '',
-          end_time: slot && typeof slot === 'object' && 'end_time' in slot ? slot.end_time as string : '',
-          professional_id: slot && typeof slot === 'object' && 'professional_id' in slot ? slot.professional_id as string : '',
-          convenio_id: slot && typeof slot === 'object' && 'convenio_id' in slot ? slot.convenio_id as string | null : null,
-          is_available: slot && typeof slot === 'object' && 'is_available' in slot ? slot.is_available as boolean : false
-        }
+        slots: slotData,
+        convenios: null // We don't have this data in this query
       };
     });
   } catch (error) {
