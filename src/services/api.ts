@@ -287,59 +287,72 @@ export const deleteConvenio = async (id: string): Promise<boolean> => {
 
 // Fetch available slots by date and professional
 export const fetchAvailableSlots = async (
-  date: string,
-  professionalId?: string,
+  date?: string,
+  professionalId?: string | null,
   convenioId?: string | null
 ): Promise<TimeSlot[]> => {
-  let query = supabase
-    .from('available_slots')
-    .select(`
-      *,
-      convenios (
-        nome
-      )
-    `)
-    .eq('is_available', true);
-
-  if (professionalId) {
-    query = query.eq('professional_id', professionalId);
-  }
-
-  if (date) {
-    // Filter by the specified date (ignoring time part)
-    const startOfDay = `${date}T00:00:00`;
-    const endOfDay = `${date}T23:59:59`;
+  try {
+    console.log(`Fetching slots for date: ${date}, professional: ${professionalId}, convenio: ${convenioId}`);
     
-    query = query.gte('start_time', startOfDay).lte('start_time', endOfDay);
+    let query = supabase
+      .from('available_slots')
+      .select('*, convenios(nome)')
+      .eq('is_available', true);
+    
+    if (date) {
+      // Convert date string to the beginning and end of the day
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      query = query
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString());
+    }
+    
+    if (professionalId) {
+      query = query.eq('professional_id', professionalId);
+    }
+    
+    if (convenioId !== undefined) {
+      if (convenioId === null) {
+        query = query.is('convenio_id', null);
+      } else {
+        query = query.eq('convenio_id', convenioId);
+      }
+    }
+    
+    const { data, error } = await query.order('start_time');
+    
+    if (error) {
+      console.error('Error fetching available slots:', error);
+      throw new Error(error.message);
+    }
+    
+    if (!data) return [];
+    
+    // Transform the data to match TimeSlot interface
+    return data.map(slot => {
+      const startTime = new Date(slot.start_time);
+      
+      return {
+        id: slot.id,
+        time: format(startTime, 'HH:mm'),
+        available: slot.is_available || false,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        professional_id: slot.professional_id,
+        convenio_id: slot.convenio_id,
+        convenio_nome: slot.convenios?.nome,
+        is_available: slot.is_available
+      };
+    });
+  } catch (error) {
+    console.error('Error in fetchAvailableSlots:', error);
+    throw error;
   }
-
-  // Filter by convenio if specified
-  if (convenioId) {
-    query = query.eq('convenio_id', convenioId);
-  } else if (convenioId === null) {
-    // If null is explicitly passed, look for slots with no convenio
-    query = query.is('convenio_id', null);
-  }
-  
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching available slots:', error);
-    throw new Error('Failed to fetch available slots');
-  }
-
-  // Format the time slots for display
-  return (data || []).map(slot => ({
-    id: slot.id,
-    time: new Date(slot.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    available: slot.is_available || false,
-    start_time: slot.start_time,
-    end_time: slot.end_time,
-    professional_id: slot.professional_id,
-    convenio_id: slot.convenio_id,
-    convenio_nome: slot.convenios?.nome,
-    is_available: slot.is_available
-  }));
 };
 
 // Function to create available slots in bulk
@@ -480,150 +493,223 @@ export const createAppointment = async (appointment: Omit<Appointment, 'id' | 'c
   return data;
 };
 
-// Function to fetch appointments with filters
-export const fetchAppointments = async (filters?: any): Promise<Appointment[]> => {
-  let query = supabase
-    .from('appointments')
-    .select(`
-      *,
-      professionals:professional_id (*),
-      services:service_id (*),
-      slots:slot_id (*)
-    `);
+interface FetchAppointmentsParams {
+  date?: string;
+  status?: string;
+  professional_id?: string;
+  convenio_id?: string;
+  queryKey?: [string, any];
+}
 
-  // Apply filters if provided
-  if (filters) {
-    if (filters.date) {
-      const startOfDay = `${filters.date}T00:00:00`;
-      const endOfDay = `${filters.date}T23:59:59`;
-      query = query.gte('appointment_date', startOfDay).lte('appointment_date', endOfDay);
+export const fetchAppointments = async (params: FetchAppointmentsParams = {}): Promise<Appointment[]> => {
+  try {
+    console.log('Fetching appointments with params:', params);
+    
+    let query = supabase
+      .from('appointments')
+      .select(`
+        *,
+        professionals(*),
+        services(*),
+        slots:available_slots(*),
+        convenios(*)
+      `);
+    
+    if (params.date) {
+      const startDate = new Date(params.date);
+      startDate.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(params.date);
+      endDate.setHours(23, 59, 59, 999);
+      
+      query = query
+        .gte('appointment_date', startDate.toISOString())
+        .lte('appointment_date', endDate.toISOString());
     }
     
-    if (filters.status) {
-      query = query.eq('status', filters.status);
+    if (params.status) {
+      query = query.eq('status', params.status);
     }
     
-    if (filters.professional_id) {
-      query = query.eq('professional_id', filters.professional_id);
+    if (params.professional_id) {
+      query = query.eq('professional_id', params.professional_id);
     }
+    
+    if (params.convenio_id) {
+      if (params.convenio_id === 'none') {
+        query = query.is('convenio_id', null);
+      } else {
+        query = query.eq('convenio_id', params.convenio_id);
+      }
+    }
+    
+    const { data, error } = await query.order('appointment_date');
+    
+    if (error) {
+      console.error('Error fetching appointments:', error);
+      throw new Error(error.message);
+    }
+    
+    if (!data) return [];
+    
+    // Transform the data to match the Appointment interface
+    return data.map(appointment => {
+      const slot = appointment.slots || {};
+      const convenio = appointment.convenios || {};
+      
+      return {
+        id: appointment.id,
+        professional_id: appointment.professional_id || '',
+        service_id: appointment.service_id || '',
+        slot_id: appointment.slot_id || '',
+        client_name: appointment.client_name,
+        client_phone: appointment.client_phone,
+        client_cpf: appointment.client_cpf || '',
+        status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
+        created_at: appointment.created_at || '',
+        updated_at: appointment.updated_at || '',
+        appointment_date: appointment.appointment_date || '',
+        convenio_id: appointment.convenio_id,
+        convenio_nome: convenio.nome,
+        professionals: appointment.professionals,
+        services: appointment.services,
+        slots: {
+          id: slot.id || '',
+          time: slot.start_time ? format(new Date(slot.start_time), 'HH:mm') : '',
+          available: false, // Already booked
+          start_time: slot.start_time || '',
+          end_time: slot.end_time || '',
+          professional_id: slot.professional_id || '',
+          convenio_id: slot.convenio_id,
+          is_available: slot.is_available || false
+        }
+      };
+    });
+  } catch (error) {
+    console.error('Error in fetchAppointments:', error);
+    throw error;
   }
-
-  const { data, error } = await query.order('appointment_date', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching appointments:', error);
-    throw new Error('Failed to fetch appointments');
-  }
-
-  // Transform the data to match the Appointment type
-  const appointments = data.map(appointment => {
-    // Transform slots data to match TimeSlot type
-    const slotData = appointment.slots || {};
-    const timeSlot: TimeSlot = {
-      id: slotData.id || '',
-      time: slotData.start_time ? new Date(slotData.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-      available: !!slotData.is_available,
-      start_time: slotData.start_time || '',
-      end_time: slotData.end_time || '',
-      professional_id: slotData.professional_id || '',
-      convenio_id: slotData.convenio_id || null,
-      is_available: !!slotData.is_available
-    };
-
-    return {
-      ...appointment,
-      status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
-      convenio_nome: appointment.convenio_nome || null,
-      slots: timeSlot
-    } as Appointment;
-  });
-
-  return appointments;
 };
 
-// Function to fetch an appointment by ID
 export const fetchAppointmentById = async (id: string): Promise<Appointment | null> => {
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      professionals:professional_id (*),
-      services:service_id (*),
-      slots:slot_id (*)
-    `)
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    console.error('Error fetching appointment:', error);
-    return null;
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        professionals(*),
+        services(*),
+        slots:available_slots(*),
+        convenios(*)
+      `)
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Record not found error (406 Not Acceptable)
+        return null;
+      }
+      console.error('Error fetching appointment by id:', error);
+      throw new Error(error.message);
+    }
+    
+    if (!data) return null;
+    
+    const slot = data.slots || {};
+    const convenio = data.convenios || {};
+    
+    return {
+      id: data.id,
+      professional_id: data.professional_id || '',
+      service_id: data.service_id || '',
+      slot_id: data.slot_id || '',
+      client_name: data.client_name,
+      client_phone: data.client_phone,
+      client_cpf: data.client_cpf || '',
+      status: data.status as 'confirmed' | 'cancelled' | 'completed',
+      created_at: data.created_at || '',
+      updated_at: data.updated_at || '',
+      appointment_date: data.appointment_date || '',
+      convenio_id: data.convenio_id,
+      convenio_nome: convenio.nome,
+      professionals: data.professionals,
+      services: data.services,
+      slots: {
+        id: slot.id || '',
+        time: slot.start_time ? format(new Date(slot.start_time), 'HH:mm') : '',
+        available: false, // Already booked
+        start_time: slot.start_time || '',
+        end_time: slot.end_time || '',
+        professional_id: slot.professional_id || '',
+        convenio_id: slot.convenio_id,
+        is_available: slot.is_available || false
+      }
+    };
+  } catch (error) {
+    console.error('Error in fetchAppointmentById:', error);
+    throw error;
   }
-
-  if (!data) return null;
-
-  // Transform slots data to match TimeSlot type
-  const slotData = data.slots || {};
-  const timeSlot: TimeSlot = {
-    id: slotData.id || '',
-    time: slotData.start_time ? new Date(slotData.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-    available: !!slotData.is_available,
-    start_time: slotData.start_time || '',
-    end_time: slotData.end_time || '',
-    professional_id: slotData.professional_id || '',
-    convenio_id: slotData.convenio_id || null,
-    is_available: !!slotData.is_available
-  };
-
-  return {
-    ...data,
-    status: data.status as 'confirmed' | 'cancelled' | 'completed',
-    convenio_nome: null,
-    slots: timeSlot
-  } as Appointment;
 };
 
-// Function to fetch appointments by CPF
 export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]> => {
-  const { data, error } = await supabase
-    .from('appointments')
-    .select(`
-      *,
-      professionals:professional_id (*),
-      services:service_id (*),
-      slots:slot_id (*)
-    `)
-    .eq('client_cpf', cpf)
-    .order('appointment_date', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching appointments by CPF:', error);
-    throw new Error('Failed to fetch appointments by CPF');
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        professionals(*),
+        services(*),
+        slots:available_slots(*),
+        convenios(*)
+      `)
+      .eq('client_cpf', cpf)
+      .order('appointment_date', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching appointments by CPF:', error);
+      throw new Error(error.message);
+    }
+    
+    if (!data) return [];
+    
+    // Transform the data to match the Appointment interface
+    return data.map(appointment => {
+      const slot = appointment.slots || {};
+      const convenio = appointment.convenios || {};
+      
+      return {
+        id: appointment.id,
+        professional_id: appointment.professional_id || '',
+        service_id: appointment.service_id || '',
+        slot_id: appointment.slot_id || '',
+        client_name: appointment.client_name,
+        client_phone: appointment.client_phone,
+        client_cpf: appointment.client_cpf || '',
+        status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
+        created_at: appointment.created_at || '',
+        updated_at: appointment.updated_at || '',
+        appointment_date: appointment.appointment_date || '',
+        convenio_id: appointment.convenio_id,
+        convenio_nome: convenio.nome,
+        professionals: appointment.professionals,
+        services: appointment.services,
+        slots: {
+          id: slot.id || '',
+          time: slot.start_time ? format(new Date(slot.start_time), 'HH:mm') : '',
+          available: false, // Already booked
+          start_time: slot.start_time || '',
+          end_time: slot.end_time || '',
+          professional_id: slot.professional_id || '',
+          convenio_id: slot.convenio_id,
+          is_available: slot.is_available || false
+        }
+      };
+    });
+  } catch (error) {
+    console.error('Error in fetchAppointmentsByCpf:', error);
+    throw error;
   }
-
-  // Transform the data to match the Appointment type
-  const appointments = (data || []).map(appointment => {
-    // Transform slots data to match TimeSlot type
-    const slotData = appointment.slots || {};
-    const timeSlot: TimeSlot = {
-      id: slotData.id || '',
-      time: slotData.start_time ? new Date(slotData.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-      available: !!slotData.is_available,
-      start_time: slotData.start_time || '',
-      end_time: slotData.end_time || '',
-      professional_id: slotData.professional_id || '',
-      convenio_id: slotData.convenio_id || null,
-      is_available: !!slotData.is_available
-    };
-
-    return {
-      ...appointment,
-      status: appointment.status as 'confirmed' | 'cancelled' | 'completed',
-      convenio_nome: null,
-      slots: timeSlot
-    } as Appointment;
-  });
-
-  return appointments;
 };
 
 // Function to update an existing appointment
@@ -1115,3 +1201,7 @@ export const testWebhook = async (url: string, event_type: string, payload: any)
     throw new Error(`Failed to test webhook: ${error.message}`);
   }
 };
+
+function format(date: Date, formatString: string): string {
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}

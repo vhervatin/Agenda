@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +17,8 @@ import { ptBR } from 'date-fns/locale';
 import { 
   fetchAppointments, 
   fetchProfessionals,
-  updateAppointmentStatus
+  updateAppointmentStatus,
+  fetchConvenios
 } from '@/services/api';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -28,11 +30,13 @@ const AppointmentsAdmin = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterProfessional, setFilterProfessional] = useState<string>('all');
+  const [filterConvenio, setFilterConvenio] = useState<string>('all');
   
   const filters = {
     date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
     status: filterStatus !== 'all' ? filterStatus : undefined,
-    professional_id: filterProfessional !== 'all' ? filterProfessional : undefined
+    professional_id: filterProfessional !== 'all' ? filterProfessional : undefined,
+    convenio_id: filterConvenio !== 'all' ? filterConvenio : undefined
   };
   
   useEffect(() => {
@@ -44,6 +48,11 @@ const AppointmentsAdmin = () => {
     queryFn: fetchProfessionals
   });
   
+  const { data: convenios = [], isLoading: isConveniosLoading } = useQuery({
+    queryKey: ['convenios'],
+    queryFn: fetchConvenios
+  });
+  
   const { 
     data: appointments = [], 
     isLoading, 
@@ -51,7 +60,7 @@ const AppointmentsAdmin = () => {
     refetch 
   } = useQuery({
     queryKey: ['appointments', filters],
-    queryFn: () => fetchAppointments({ queryKey: ['appointments', filters] })
+    queryFn: () => fetchAppointments(filters)
   });
   
   useEffect(() => {
@@ -165,10 +174,16 @@ const AppointmentsAdmin = () => {
     setTimeout(() => refetch(), 100);
   };
   
+  const handleConvenioChange = (convenioId: string) => {
+    setFilterConvenio(convenioId);
+    setTimeout(() => refetch(), 100);
+  };
+  
   const resetFilters = () => {
     setSelectedDate(undefined);
     setFilterStatus('all');
     setFilterProfessional('all');
+    setFilterConvenio('all');
     setTimeout(() => refetch(), 100);
   };
   
@@ -256,6 +271,27 @@ const AppointmentsAdmin = () => {
                 </div>
                 
                 <div className="space-y-2">
+                  <Label htmlFor="filter-convenio">Convênio</Label>
+                  <Select 
+                    value={filterConvenio} 
+                    onValueChange={handleConvenioChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os convênios" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os convênios</SelectItem>
+                      <SelectItem value="none">Sem convênio (Particular)</SelectItem>
+                      {convenios.map((convenio) => (
+                        <SelectItem key={convenio.id} value={convenio.id}>
+                          {convenio.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
                   <Label htmlFor="filter-status">Status</Label>
                   <Select 
                     value={filterStatus} 
@@ -296,6 +332,11 @@ const AppointmentsAdmin = () => {
                 ) : 'Todos os agendamentos'}
                 {filterProfessional !== 'all' && (
                   <span> - {professionals.find(p => p.id === filterProfessional)?.name || 'Profissional'}</span>
+                )}
+                {filterConvenio !== 'all' && (
+                  <span> - {filterConvenio === 'none' ? 'Sem convênio' : 
+                    convenios.find(c => c.id === filterConvenio)?.nome || 'Convênio'}
+                  </span>
                 )}
                 {filterStatus !== 'all' && (
                   <span> - {
@@ -343,6 +384,7 @@ const AppointmentsAdmin = () => {
                                   <TableHead>Telefone</TableHead>
                                   <TableHead>Profissional</TableHead>
                                   <TableHead>Serviço</TableHead>
+                                  <TableHead>Convênio</TableHead>
                                   <TableHead>Status</TableHead>
                                   <TableHead className="w-[100px]">Ações</TableHead>
                                 </TableRow>
@@ -359,6 +401,7 @@ const AppointmentsAdmin = () => {
                                     <TableCell>{appointment.client_phone}</TableCell>
                                     <TableCell>{appointment.professionals?.name || '-'}</TableCell>
                                     <TableCell>{appointment.services?.name || '-'}</TableCell>
+                                    <TableCell>{appointment.convenio_nome || 'Particular'}</TableCell>
                                     <TableCell>
                                       <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
                                         {getStatusIcon(appointment.status)}
@@ -412,6 +455,11 @@ const AppointmentsAdmin = () => {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Serviço</p>
                   <p className="font-medium">{selectedAppointment.services?.name || '-'}</p>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Convênio</p>
+                  <p className="font-medium">{selectedAppointment.convenio_nome || 'Particular'}</p>
                 </div>
                 
                 <div className="space-y-1">
