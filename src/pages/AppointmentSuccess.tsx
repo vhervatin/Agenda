@@ -7,30 +7,51 @@ import { toast } from 'sonner';
 import NavBar from '@/components/NavBar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { fetchAppointmentById } from '@/services/api';
+import { fetchAppointmentById, fetchConvenioById } from '@/services/api';
+import { Appointment, Convenio } from '@/types/types';
 
 const AppointmentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const appointmentId = searchParams.get('id');
   
-  const [appointment, setAppointment] = useState<any>(null);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [convenio, setConvenio] = useState<Convenio | null>(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    if (appointmentId) {
-      setLoading(true);
-      fetchAppointmentById(appointmentId)
-        .then(data => {
-          setAppointment(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error("Error fetching appointment:", error);
-          toast.error("Não foi possível carregar os detalhes do agendamento");
-          setLoading(false);
-        });
-    }
+    const loadData = async () => {
+      if (!appointmentId) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const appointmentData = await fetchAppointmentById(appointmentId);
+        
+        if (appointmentData) {
+          setAppointment(appointmentData);
+          
+          // Se tiver convenio_id, buscar os dados do convênio
+          if (appointmentData.convenio_id) {
+            try {
+              const convenioData = await fetchConvenioById(appointmentData.convenio_id);
+              setConvenio(convenioData);
+            } catch (err) {
+              console.error("Error fetching convenio:", err);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching appointment:", error);
+        toast.error("Não foi possível carregar os detalhes do agendamento");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, [appointmentId]);
   
   const formatDuration = (minutes: number) => {
@@ -152,6 +173,13 @@ const AppointmentSuccess = () => {
               <h3 className="font-semibold text-lg mb-2">Profissional</h3>
               <p>{appointment.professionals?.name}</p>
             </div>
+            
+            {convenio && (
+              <div className="border-b pb-4">
+                <h3 className="font-semibold text-lg mb-2">Convênio</h3>
+                <p>{convenio.nome}</p>
+              </div>
+            )}
             
             <div>
               <h3 className="font-semibold text-lg mb-2">Seus dados</h3>

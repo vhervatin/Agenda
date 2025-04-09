@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { Service, Professional, TimeSlot, Appointment, Convenio, WebhookConfiguration, WebhookLog, Company, User, ProfessionalService } from '@/types/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -608,8 +607,7 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
         *,
         professionals(*),
         services(*),
-        slots:available_slots(*),
-        convenios(*)
+        slots:available_slots(*)
       `)
       .eq('id', id)
       .single();
@@ -626,9 +624,6 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
     if (!data) return null;
     
     const slot = data.slots || {};
-    const convenio = data.convenios || null;
-    const convenioNome = convenio && typeof convenio === 'object' && 'nome' in convenio ? 
-      convenio.nome as string : null;
     
     const slotData: TimeSlot = {
       id: typeof slot === 'object' && slot !== null && 'id' in slot ? String(slot.id) : '',
@@ -656,10 +651,11 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       updated_at: data.updated_at || '',
       appointment_date: data.appointment_date || '',
       convenio_id: data.convenio_id,
-      convenio_nome: convenioNome,
+      convenio_nome: data.convenio_id ? data.convenio_nome : null,
       professionals: data.professionals,
       services: data.services,
-      slots: slotData
+      slots: slotData,
+      convenios: null // Não temos esses dados nesta consulta
     };
   } catch (error) {
     console.error('Error in fetchAppointmentById:', error);
@@ -717,11 +713,11 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
         convenio_id: appointment.convenio_id,
-        convenio_nome: appointment.convenio_nome || null,
+        convenio_nome: appointment.convenio_id ? appointment.convenio_nome : null,
         professionals: appointment.professionals,
         services: appointment.services,
         slots: slotData,
-        convenios: null // We don't have this data in this query
+        convenios: null // Não temos esses dados nesta consulta
       };
     });
   } catch (error) {
