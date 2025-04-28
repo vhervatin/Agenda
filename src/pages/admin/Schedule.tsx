@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parse, addDays, addMinutes, setHours, setMinutes } from 'date-fns';
@@ -7,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,8 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Trash2, Calendar as CalendarIcon, X, Filter } from 'lucide-react';
 import ScheduleForm from '@/components/admin/ScheduleForm';
-import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments, fetchProfessionals, deleteAvailableSlot, deleteAvailableSlotsByDate, fetchConvenios } from '@/services/api';
-import { TimeRange, TimeSlot, Convenio } from '@/types/types';
+import { fetchAvailableSlots, createAvailableSlotsBulk, fetchAppointments, fetchProfessionals, deleteAvailableSlot, deleteAvailableSlotsByDate } from '@/services/api';
+import { TimeRange, TimeSlot } from '@/types/types';
 import { ptBR } from 'date-fns/locale';
 
 // Interface para os slots locais
@@ -27,8 +26,6 @@ interface Slot {
   start_time: string;
   end_time: string;
   is_available: boolean;
-  convenio_id?: string | null;
-  convenio_nome?: string;
 }
 
 const generateTimeSlots = (startTime: string, endTime: string, interval: number) => {
@@ -52,7 +49,6 @@ const Schedule = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotDuration, setSlotDuration] = useState(30);
-  const [convenioFilter, setConvenioFilter] = useState<string | null>(null);
   
   const [professionalId, setProfessionalId] = useState('');
   const [dateRange, setDateRange] = useState<Date[]>([]);
@@ -62,7 +58,6 @@ const Schedule = () => {
     endHour: '18',
     endMinute: '00',
   });
-  const [selectedConvenioId, setSelectedConvenioId] = useState<string | null>(null);
   
   // Get the date string for the API
   const formattedDate = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
@@ -72,43 +67,26 @@ const Schedule = () => {
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
   });
-
-  // Fetch convenios for filtering
-  const { data: convenios = [] } = useQuery({
-    queryKey: ['convenios'],
-    queryFn: fetchConvenios
-  });
   
   const { data: availableSlotsData = [], isLoading: isLoadingAvailableSlots, refetch: refetchSlots } = useQuery({
-    queryKey: ['availableSlots', formattedDate, convenioFilter],
-    queryFn: () => fetchAvailableSlots(formattedDate),
+    queryKey: ['availableSlots', formattedDate],
+    queryFn: () => fetchAvailableSlots(formattedDate, null),
     enabled: !!formattedDate
   });
   
   useEffect(() => {
     if (availableSlotsData) {
-      // Converta TimeSlot[] para Slot[] e aplique filtro por convênio se necessário
-      let convertedSlots: Slot[] = availableSlotsData.map(slot => ({
+      // Converta TimeSlot[] para Slot[]
+      const convertedSlots: Slot[] = availableSlotsData.map(slot => ({
         id: slot.id,
         start_time: slot.start_time || '',
         end_time: slot.end_time || '',
-        is_available: slot.is_available || false,
-        convenio_id: slot.convenio_id,
-        convenio_nome: slot.convenio_nome
+        is_available: slot.is_available ?? slot.available ?? false
       }));
-
-      // Aplicar filtro por convênio se estiver selecionado
-      if (convenioFilter) {
-        convertedSlots = convertedSlots.filter(slot => 
-          convenioFilter === 'none' 
-            ? !slot.convenio_id 
-            : slot.convenio_id === convenioFilter
-        );
-      }
       
       setSlots(convertedSlots);
     }
-  }, [availableSlotsData, convenioFilter]);
+  }, [availableSlotsData]);
   
   const createSlotsMutation = useMutation({
     mutationFn: createAvailableSlotsBulk,
@@ -169,14 +147,6 @@ const Schedule = () => {
     setProfessionalId(newProfessionalId);
   };
 
-  const handleConvenioChange = (newConvenioId: string | null) => {
-    setSelectedConvenioId(newConvenioId);
-  };
-
-  const handleConvenioFilterChange = (value: string) => {
-    setConvenioFilter(value === 'all' ? null : value);
-  };
-
   const handleSlotDurationChange = (duration: number) => {
     setSlotDuration(duration);
   };
@@ -219,8 +189,7 @@ const Schedule = () => {
           professional_id: professionalId,
           start_time: startDateTime.toISOString(),
           end_time: endDateTime.toISOString(),
-          is_available: true,
-          convenio_id: selectedConvenioId
+          is_available: true
         });
       });
     });
@@ -259,7 +228,6 @@ const Schedule = () => {
                 onDateRangeChange={handleDateRangeChange}
                 onProfessionalChange={handleProfessionalChange}
                 onSlotDurationChange={handleSlotDurationChange}
-                onConvenioChange={handleConvenioChange}
                 onSubmit={handleGenerateSlots}
                 isLoading={createSlotsMutation.isPending}
                 onClose={handleCloseDialog}
@@ -268,153 +236,128 @@ const Schedule = () => {
           </Dialog>
         </div>
         
-        <Card>
-          <CardContent className="grid gap-6 md:grid-cols-2 p-4 md:p-6">
-            <div className="w-full flex flex-col gap-4">
-              <div className="w-full max-w-[300px] border rounded-md overflow-hidden">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={handleDateSelect}
-                  locale={ptBR}
-                  className="border-0"
-                />
-              </div>
-              
-              <div className="w-full max-w-[300px]">
-                <Label htmlFor="convenio-filter" className="mb-2 block">Filtrar por convênio</Label>
-                <Select
-                  value={convenioFilter === null ? 'all' : convenioFilter}
-                  onValueChange={handleConvenioFilterChange}
-                >
-                  <SelectTrigger id="convenio-filter" className="w-full">
-                    <SelectValue placeholder="Filtrar por convênio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os convênios</SelectItem>
-                    <SelectItem value="none">Sem convênio (Particular)</SelectItem>
-                    {convenios.map((convenio) => (
-                      <SelectItem key={convenio.id} value={convenio.id}>
-                        {convenio.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">
-                  Horários para {selectedDate ? format(selectedDate, 'dd/MM/yyyy', { locale: ptBR }) : 'Data não selecionada'}
-                </h2>
-                
+        <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Calendário</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={handleDateSelect}
+                className="w-full"
+                locale={ptBR}
+                initialFocus
+              />
+            </CardContent>
+          </Card>
+          
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>Horários Disponíveis</CardTitle>
                 {selectedDateHasSlots && (
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="flex items-center gap-1"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span>Excluir Todos</span>
-                  </Button>
+                  <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remover Todos
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Remover Todos os Horários</DialogTitle>
+                        <DialogDescription>
+                          Tem certeza que deseja remover todos os horários do dia {selectedDate ? format(selectedDate, 'dd/MM/yyyy') : ''}?
+                          Esta ação não pode ser desfeita.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button variant="outline">Cancelar</Button>
+                        </DialogClose>
+                        <Button variant="destructive" onClick={handleDeleteAllSlots}>
+                          Remover Todos
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 )}
-              </div>
-              
-              {isLoadingAvailableSlots ? (
-                <div className="text-center py-4">Carregando horários...</div>
-              ) : (
-                <>
-                  {availableSlots.length === 0 && bookedSlots.length === 0 ? (
-                    <Alert className="bg-muted">
-                      <CalendarIcon className="h-4 w-4" />
-                      <AlertDescription>
-                        Nenhum horário disponível para este dia. Use o botão "Gerar Horários" para adicionar vagas.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Horário</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Convênio</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAvailableSlots ? (
+                  <div className="text-center py-8">Carregando horários...</div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {selectedDate ? "Nenhum horário disponível para esta data." : "Selecione uma data para ver os horários disponíveis."}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    {availableSlots.map((slot) => (
+                      <div
+                        key={slot.id}
+                        className="flex items-center justify-between p-2 border rounded-md"
+                      >
+                        <span>{format(new Date(slot.start_time), 'HH:mm')}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteSlot(slot.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Agendamentos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingAppointments ? (
+                  <div className="text-center py-8">Carregando agendamentos...</div>
+                ) : bookedSlots.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum agendamento para esta data.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Horário</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Serviço</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bookedSlots.map((appointment) => (
+                        <TableRow key={appointment.id}>
+                          <TableCell>
+                            {format(new Date(appointment.slots.start_time), 'HH:mm')}
+                          </TableCell>
+                          <TableCell>{appointment.client_name}</TableCell>
+                          <TableCell>{appointment.service_name}</TableCell>
+                          <TableCell>
+                            <Badge variant={appointment.status === 'confirmed' ? 'default' : 'secondary'}>
+                              {appointment.status === 'confirmed' ? 'Confirmado' : 'Concluído'}
+                            </Badge>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {availableSlots.map((slot) => (
-                          <TableRow key={slot.id}>
-                            <TableCell>
-                              {format(new Date(slot.start_time), 'HH:mm')}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">Disponível</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {slot.convenio_nome || 'Particular'}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleDeleteSlot(slot.id)}
-                                className="h-8 w-8 text-destructive"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        {bookedSlots.map((appointment) => (
-                          <TableRow key={appointment.id}>
-                            <TableCell>
-                              {appointment.slots?.start_time && format(new Date(appointment.slots.start_time), 'HH:mm')}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">Agendado</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {appointment.convenio_nome || 'Particular'}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {/* Ações indisponíveis para slots agendados */}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-
-      {/* Dialog de confirmação para excluir todos os horários */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar exclusão</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir todos os horários do dia {selectedDate ? format(selectedDate, 'dd/MM/yyyy', { locale: ptBR }) : ''}?
-              Esta ação não pode ser desfeita.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteAllSlots}
-              disabled={deleteSlotsByDateMutation.isPending}
-            >
-              {deleteSlotsByDateMutation.isPending ? 'Excluindo...' : 'Excluir Todos'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 };

@@ -97,7 +97,7 @@ const Index = () => {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
               <p className="text-muted-foreground text-sm">
-                © 2024 Agenda. Todos os direitos reservados.
+                © 2025 Glívan Sistemas (79) 99813-0038. Todos os direitos reservados.
               </p>
             </div>
             <div className="flex space-x-6">

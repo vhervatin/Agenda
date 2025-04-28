@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -19,7 +18,6 @@ interface AppointmentSummaryProps {
   clientName: string;
   clientPhone: string;
   clientCpf: string;
-  convenio?: string;
   onConfirm: () => void;
   onEdit: () => void;
   isSubmitting: boolean;
@@ -33,7 +31,6 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
   clientName,
   clientPhone,
   clientCpf,
-  convenio,
   onConfirm,
   onEdit,
   isSubmitting
@@ -78,16 +75,6 @@ const AppointmentSummary: React.FC<AppointmentSummaryProps> = ({
             <h3 className="text-lg font-semibold">Profissional</h3>
             <p className="text-muted-foreground">{professionalName}</p>
           </div>
-          
-          {convenio && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="text-lg font-semibold">Convênio</h3>
-                <p className="text-muted-foreground">{convenio}</p>
-              </div>
-            </>
-          )}
           
           <Separator />
           

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,13 +29,11 @@ const AppointmentsAdmin = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterProfessional, setFilterProfessional] = useState<string>('all');
-  const [filterConvenio, setFilterConvenio] = useState<string>('all');
   
   const filters = {
     date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
     status: filterStatus !== 'all' ? filterStatus : undefined,
-    professional_id: filterProfessional !== 'all' ? filterProfessional : undefined,
-    convenio_id: filterConvenio !== 'all' ? filterConvenio : undefined
+    professional_id: filterProfessional !== 'all' ? filterProfessional : undefined
   };
   
   useEffect(() => {
@@ -46,11 +43,6 @@ const AppointmentsAdmin = () => {
   const { data: professionals = [], isLoading: isProfessionalsLoading } = useQuery({
     queryKey: ['professionals'],
     queryFn: fetchProfessionals
-  });
-  
-  const { data: convenios = [], isLoading: isConveniosLoading } = useQuery({
-    queryKey: ['convenios'],
-    queryFn: fetchConvenios
   });
   
   const { 
@@ -174,16 +166,10 @@ const AppointmentsAdmin = () => {
     setTimeout(() => refetch(), 100);
   };
   
-  const handleConvenioChange = (convenioId: string) => {
-    setFilterConvenio(convenioId);
-    setTimeout(() => refetch(), 100);
-  };
-  
   const resetFilters = () => {
     setSelectedDate(undefined);
     setFilterStatus('all');
     setFilterProfessional('all');
-    setFilterConvenio('all');
     setTimeout(() => refetch(), 100);
   };
   
@@ -239,13 +225,14 @@ const AppointmentsAdmin = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Data</Label>
-                  <div className="border rounded-md p-0 sm:p-2 flex justify-center overflow-hidden">
+                  <div className="rounded-md border">
                     <Calendar
                       mode="single"
                       selected={selectedDate}
                       onSelect={handleDateSelect}
-                      className="max-w-full"
+                      className="w-full"
                       locale={ptBR}
+                      initialFocus
                     />
                   </div>
                 </div>
@@ -264,27 +251,6 @@ const AppointmentsAdmin = () => {
                       {professionals.map((professional) => (
                         <SelectItem key={professional.id} value={professional.id}>
                           {professional.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="filter-convenio">Convênio</Label>
-                  <Select 
-                    value={filterConvenio} 
-                    onValueChange={handleConvenioChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos os convênios" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os convênios</SelectItem>
-                      <SelectItem value="none">Sem convênio (Particular)</SelectItem>
-                      {convenios.map((convenio) => (
-                        <SelectItem key={convenio.id} value={convenio.id}>
-                          {convenio.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -333,11 +299,6 @@ const AppointmentsAdmin = () => {
                 {filterProfessional !== 'all' && (
                   <span> - {professionals.find(p => p.id === filterProfessional)?.name || 'Profissional'}</span>
                 )}
-                {filterConvenio !== 'all' && (
-                  <span> - {filterConvenio === 'none' ? 'Sem convênio' : 
-                    convenios.find(c => c.id === filterConvenio)?.nome || 'Convênio'}
-                  </span>
-                )}
                 {filterStatus !== 'all' && (
                   <span> - {
                     filterStatus === 'confirmed' ? 'Confirmados' : 
@@ -384,7 +345,6 @@ const AppointmentsAdmin = () => {
                                   <TableHead>Telefone</TableHead>
                                   <TableHead>Profissional</TableHead>
                                   <TableHead>Serviço</TableHead>
-                                  <TableHead>Convênio</TableHead>
                                   <TableHead>Status</TableHead>
                                   <TableHead className="w-[100px]">Ações</TableHead>
                                 </TableRow>
@@ -401,7 +361,6 @@ const AppointmentsAdmin = () => {
                                     <TableCell>{appointment.client_phone}</TableCell>
                                     <TableCell>{appointment.professionals?.name || '-'}</TableCell>
                                     <TableCell>{appointment.services?.name || '-'}</TableCell>
-                                    <TableCell>{appointment.convenio_nome || 'Particular'}</TableCell>
                                     <TableCell>
                                       <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
                                         {getStatusIcon(appointment.status)}
@@ -455,11 +414,6 @@ const AppointmentsAdmin = () => {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Serviço</p>
                   <p className="font-medium">{selectedAppointment.services?.name || '-'}</p>
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Convênio</p>
-                  <p className="font-medium">{selectedAppointment.convenio_nome || 'Particular'}</p>
                 </div>
                 
                 <div className="space-y-1">

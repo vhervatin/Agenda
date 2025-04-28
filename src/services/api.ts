@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Service, Professional, TimeSlot, Appointment, Convenio, WebhookConfiguration, WebhookLog, Company, User, ProfessionalService } from '@/types/types';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 // Function to fetch all services
 export const fetchServices = async (): Promise<Service[]> => {
@@ -288,15 +289,14 @@ export const deleteConvenio = async (id: string): Promise<boolean> => {
 // Fetch available slots by date and professional
 export const fetchAvailableSlots = async (
   date?: string,
-  professionalId?: string | null,
-  convenioId?: string | null
+  professionalId?: string | null
 ): Promise<TimeSlot[]> => {
   try {
-    console.log(`Fetching slots for date: ${date}, professional: ${professionalId}, convenio: ${convenioId}`);
+    console.log(`Fetching slots for date: ${date}, professional: ${professionalId}`);
     
     let query = supabase
       .from('available_slots')
-      .select('*, convenios(nome)')
+      .select('*')
       .eq('is_available', true);
     
     if (date) {
@@ -316,14 +316,6 @@ export const fetchAvailableSlots = async (
       query = query.eq('professional_id', professionalId);
     }
     
-    if (convenioId !== undefined) {
-      if (convenioId === null) {
-        query = query.is('convenio_id', null);
-      } else {
-        query = query.eq('convenio_id', convenioId);
-      }
-    }
-    
     const { data, error } = await query.order('start_time');
     
     if (error) {
@@ -336,7 +328,6 @@ export const fetchAvailableSlots = async (
     // Transform the data to match TimeSlot interface
     return data.map(slot => {
       const startTime = new Date(slot.start_time);
-      const convenioData = slot.convenios as Convenio | null;
       
       return {
         id: slot.id,
@@ -345,8 +336,6 @@ export const fetchAvailableSlots = async (
         start_time: slot.start_time,
         end_time: slot.end_time,
         professional_id: slot.professional_id,
-        convenio_id: slot.convenio_id,
-        convenio_nome: convenioData?.nome,
         is_available: slot.is_available
       };
     });
@@ -375,7 +364,6 @@ export const createAvailableSlotsBulk = async (slots: Omit<TimeSlot, 'id' | 'tim
     start_time: slot.start_time,
     end_time: slot.end_time,
     professional_id: slot.professional_id,
-    convenio_id: slot.convenio_id,
     is_available: slot.is_available
   }));
 
@@ -510,10 +498,9 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
       .from('appointments')
       .select(`
         *,
-        professionals(*),
-        services(*),
-        slots:available_slots(*),
-        convenios(*)
+        professionals!professional_id(*),
+        services!service_id(*),
+        slots:available_slots!slot_id(*)
       `);
     
     if (params.date) {
@@ -544,7 +531,7 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
       }
     }
     
-    const { data, error } = await query.order('appointment_date');
+    const { data, error } = await query.order('appointment_date', { ascending: true });
     
     if (error) {
       console.error('Error fetching appointments:', error);
@@ -556,21 +543,15 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
     // Transform the data to match the Appointment interface
     return data.map(appointment => {
       const slot = appointment.slots || {};
-      const convenio = appointment.convenios || null;
       
-      const convenioNome = convenio && typeof convenio === 'object' && 'nome' in convenio ? 
-        convenio.nome as string : null;
-        
       const slotData: TimeSlot = {
         id: typeof slot === 'object' && slot !== null && 'id' in slot ? String(slot.id) : '',
         time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? 
           format(new Date(String(slot.start_time)), 'HH:mm') : '',
-        available: false, // Already booked
+        available: false,
         start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
         end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
         professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
-        convenio_id: typeof slot === 'object' && slot !== null && 'convenio_id' in slot ? 
-          (slot.convenio_id !== null ? String(slot.convenio_id) : null) : null,
         is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
       };
       
@@ -586,8 +567,6 @@ export const fetchAppointments = async (params: FetchAppointmentsParams = {}): P
         created_at: appointment.created_at || '',
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
-        convenio_id: appointment.convenio_id,
-        convenio_nome: convenioNome,
         professionals: appointment.professionals,
         services: appointment.services,
         slots: slotData
@@ -605,9 +584,9 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       .from('appointments')
       .select(`
         *,
-        professionals(*),
-        services(*),
-        slots:available_slots(*)
+        professionals!professional_id(*),
+        services!service_id(*),
+        slots:available_slots!slot_id(*)
       `)
       .eq('id', id)
       .single();
@@ -633,8 +612,6 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
       end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
       professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
-      convenio_id: typeof slot === 'object' && slot !== null && 'convenio_id' in slot ? 
-        (slot.convenio_id !== null ? String(slot.convenio_id) : null) : null,
       is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
     };
     
@@ -650,12 +627,9 @@ export const fetchAppointmentById = async (id: string): Promise<Appointment | nu
       created_at: data.created_at || '',
       updated_at: data.updated_at || '',
       appointment_date: data.appointment_date || '',
-      convenio_id: data.convenio_id,
-      convenio_nome: data.convenio_id ? data.convenio_nome : null,
       professionals: data.professionals,
       services: data.services,
-      slots: slotData,
-      convenios: null // Não temos esses dados nesta consulta
+      slots: slotData
     };
   } catch (error) {
     console.error('Error in fetchAppointmentById:', error);
@@ -669,9 +643,9 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
       .from('appointments')
       .select(`
         *,
-        professionals(*),
-        services(*),
-        slots:available_slots(*)
+        professionals!professional_id(*),
+        services!service_id(*),
+        slots:available_slots!slot_id(*)
       `)
       .eq('client_cpf', cpf)
       .order('appointment_date', { ascending: false });
@@ -695,8 +669,6 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
         start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
         end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
         professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
-        convenio_id: typeof slot === 'object' && slot !== null && 'convenio_id' in slot ? 
-          (slot.convenio_id !== null ? String(slot.convenio_id) : null) : null,
         is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
       };
       
@@ -712,12 +684,9 @@ export const fetchAppointmentsByCpf = async (cpf: string): Promise<Appointment[]
         created_at: appointment.created_at || '',
         updated_at: appointment.updated_at || '',
         appointment_date: appointment.appointment_date || '',
-        convenio_id: appointment.convenio_id,
-        convenio_nome: appointment.convenio_id ? appointment.convenio_nome : null,
         professionals: appointment.professionals,
         services: appointment.services,
-        slots: slotData,
-        convenios: null // Não temos esses dados nesta consulta
+        slots: slotData
       };
     });
   } catch (error) {
@@ -750,50 +719,65 @@ export const updateAppointment = async (id: string, updates: Partial<Appointment
 
 // Function to update an appointment status
 export const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed'): Promise<Appointment | null> => {
-  const { data: appointmentData, error: fetchError } = await supabase
+  // Primeiro, buscar o agendamento para obter o slot_id
+  const { data: appointment, error: fetchError } = await supabase
     .from('appointments')
-    .select('slot_id, status')
+    .select('*, available_slots(*)')
     .eq('id', id)
     .single();
 
   if (fetchError) {
     console.error('Error fetching appointment:', fetchError);
-    throw new Error('Failed to fetch appointment');
+    return null;
   }
 
-  // Update appointment status
-  const { data, error } = await supabase
+  // Atualizar o status do agendamento
+  const { data: updatedAppointment, error: updateError } = await supabase
     .from('appointments')
     .update({ status })
     .eq('id', id)
     .select()
     .single();
 
-  if (error) {
-    console.error('Error updating appointment status:', error);
+  if (updateError) {
+    console.error('Error updating appointment status:', updateError);
     return null;
   }
 
-  // If the appointment is cancelled, make the slot available again
-  if (status === 'cancelled' && appointmentData.status !== 'cancelled') {
+  // Se o agendamento foi cancelado, reativar o horário
+  if (status === 'cancelled' && appointment.available_slots?.id) {
     const { error: slotError } = await supabase
       .from('available_slots')
       .update({ is_available: true })
-      .eq('id', appointmentData.slot_id);
+      .eq('id', appointment.available_slots.id);
 
     if (slotError) {
-      console.error('Error updating slot availability:', slotError);
-      // The appointment status was updated, but we failed to update the slot
-      // We'll still return the appointment data and log the error
+      console.error('Error reactivating slot:', slotError);
+      // Não retornamos null aqui para não impedir o cancelamento do agendamento
     }
   }
 
-  if (!data) return null;
+  // Transformar o appointment para o formato correto
+  if (updatedAppointment) {
+    const slot = updatedAppointment.available_slots || {};
+    
+    return {
+      ...updatedAppointment,
+      status: updatedAppointment.status as 'confirmed' | 'cancelled' | 'completed',
+      slots: {
+        id: typeof slot === 'object' && slot !== null && 'id' in slot ? String(slot.id) : '',
+        time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? 
+          format(new Date(String(slot.start_time)), 'HH:mm') : '',
+        available: false,
+        start_time: typeof slot === 'object' && slot !== null && 'start_time' in slot ? String(slot.start_time) : '',
+        end_time: typeof slot === 'object' && slot !== null && 'end_time' in slot ? String(slot.end_time) : '',
+        professional_id: typeof slot === 'object' && slot !== null && 'professional_id' in slot ? String(slot.professional_id) : '',
+        is_available: typeof slot === 'object' && slot !== null && 'is_available' in slot ? Boolean(slot.is_available) : false
+      }
+    };
+  }
 
-  return {
-    ...data,
-    status: data.status as 'confirmed' | 'cancelled' | 'completed'
-  };
+  return null;
 };
 
 // Function to delete an appointment
@@ -1215,7 +1199,3 @@ export const testWebhook = async (url: string, event_type: string, payload: any)
     throw new Error(`Failed to test webhook: ${error.message}`);
   }
 };
-
-function format(date: Date, formatString: string): string {
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}

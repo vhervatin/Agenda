@@ -33,9 +33,9 @@ const AppointmentCard = ({
   onCancel?: (id: string) => void 
 }) => {
   // Format the date from the appointment
-  const formatAppointmentDate = (startTime: string) => {
-    if (!startTime) return '';
-    const date = new Date(startTime);
+  const formatAppointmentDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
       day: 'numeric',
       month: 'long',
@@ -58,9 +58,9 @@ const AppointmentCard = ({
             {appointment.services?.name || appointment.service}
           </span>
           <h3 className="font-medium">
-            {appointment.slots?.start_time 
-              ? formatAppointmentDate(appointment.slots.start_time) 
-              : appointment.date}
+            {appointment.appointment_date 
+              ? formatAppointmentDate(appointment.appointment_date)
+              : ''}
           </h3>
           <div className="flex items-center mt-1 text-sm text-muted-foreground">
             <Clock className="h-3 w-3 mr-1" />
@@ -219,7 +219,11 @@ const Appointments = () => {
     mutationFn: async (appointmentId: string) => {
       return await updateAppointmentStatus(appointmentId, 'cancelled');
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Atualizar a lista de agendamentos removendo o agendamento cancelado
+      setAppointments(prevAppointments => 
+        prevAppointments.filter(app => app.id !== data?.id)
+      );
       queryClient.invalidateQueries({ queryKey: ['appointments', clientCpf] });
       toast.success("Agendamento cancelado com sucesso!");
     },
@@ -232,6 +236,7 @@ const Appointments = () => {
   // Update appointments when data is fetched
   useEffect(() => {
     if (fetchedAppointments) {
+      console.log('Agendamentos recebidos:', fetchedAppointments);
       setAppointments(fetchedAppointments);
     }
   }, [fetchedAppointments]);
@@ -241,39 +246,49 @@ const Appointments = () => {
     cancelAppointmentMutation.mutate(id);
   };
   
-  // Filter appointments based on search query
+  // Filter appointments based on search query and tab
   const filteredAppointments = appointments.filter(app => {
     const serviceName = app.services?.name || app.service || '';
     const professionalName = app.professionals?.name || app.provider || '';
-    const appointmentDate = app.slots?.start_time ? new Date(app.slots.start_time) : null;
+    const appointmentDate = app.appointment_date ? new Date(app.appointment_date) : null;
     const formattedDate = appointmentDate ? 
       new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).format(appointmentDate) : 
-      app.date || '';
+      '';
     
-    return (
+    const matchesSearch = (
       serviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       professionalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       formattedDate.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  });
-  
-  // Separate upcoming and past appointments
-  const now = new Date();
-  const upcomingAppointments = filteredAppointments.filter(app => {
-    if (app.status === 'cancelled' || app.status === 'completed') return false;
-    
-    const appointmentDate = app.slots?.start_time ? new Date(app.slots.start_time) : null;
-    return appointmentDate ? appointmentDate > now : true; // Default to upcoming if no date
-  });
-  
-  const pastOrCancelledAppointments = filteredAppointments.filter(app => {
-    if (app.status === 'cancelled') return true;
-    if (app.status === 'completed') return true;
-    
-    const appointmentDate = app.slots?.start_time ? new Date(app.slots.start_time) : null;
-    return appointmentDate ? appointmentDate <= now : false;
+
+    return matchesSearch;
   });
 
+  // Separate appointments into upcoming and past
+  const now = new Date();
+  const upcomingAppointments = filteredAppointments.filter(app => {
+    const appointmentDate = app.appointment_date ? new Date(app.appointment_date) : null;
+    return appointmentDate && appointmentDate >= now && app.status !== 'cancelled';
+  });
+
+  const pastAppointments = filteredAppointments.filter(app => {
+    const appointmentDate = app.appointment_date ? new Date(app.appointment_date) : null;
+    return appointmentDate && (appointmentDate < now || app.status === 'cancelled');
+  });
+
+  // Sort appointments by date
+  upcomingAppointments.sort((a, b) => {
+    const dateA = new Date(a.appointment_date);
+    const dateB = new Date(b.appointment_date);
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  pastAppointments.sort((a, b) => {
+    const dateA = new Date(a.appointment_date);
+    const dateB = new Date(b.appointment_date);
+    return dateB.getTime() - dateA.getTime(); // Ordem decrescente para histórico
+  });
+  
   // If no CPF provided yet, show the CPF entry form
   if (!clientCpf) {
     return (
@@ -383,8 +398,8 @@ const Appointments = () => {
                 </TabsContent>
                 
                 <TabsContent value="past" className="space-y-4">
-                  {pastOrCancelledAppointments.length > 0 ? (
-                    pastOrCancelledAppointments.map(appointment => (
+                  {pastAppointments.length > 0 ? (
+                    pastAppointments.map(appointment => (
                       <AppointmentCard
                         key={appointment.id}
                         appointment={appointment}

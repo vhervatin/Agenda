@@ -1,9 +1,9 @@
 export interface Service {
   id: string;
   name: string;
+  description?: string;
   duration: number;
   price: number;
-  description: string;
   active: boolean;
   services?: Service; // For nested service objects from the API
 }
@@ -11,8 +11,8 @@ export interface Service {
 export interface Professional {
   id: string;
   name: string;
-  bio: string;
-  photo_url: string;
+  photo_url?: string;
+  bio?: string;
   phone?: string; // Added phone field to match admin interface
   active: boolean;
   professionals?: Professional; // For nested professional objects from the API
@@ -28,33 +28,25 @@ export interface TimeSlot {
   id: string;
   time: string;
   available: boolean;
-  start_time: string;
-  end_time: string;
+  start_time?: string;
+  end_time?: string;
   professional_id?: string;
   is_available?: boolean;
-  convenio_id?: string | null;
-  convenio_nome?: string | null;
-  convenios?: Convenio | null;
 }
 
 export interface Appointment {
   id: string;
-  professional_id: string;
-  service_id: string;
-  slot_id: string;
   client_name: string;
   client_phone: string;
   client_cpf: string;
   status: 'confirmed' | 'cancelled' | 'completed';
-  created_at: string;
   appointment_date: string;
+  service_name: string;
+  slots: TimeSlot;
+  created_at: string;
   updated_at?: string;
   professionals?: Professional;
   services?: Service;
-  slots?: TimeSlot;
-  convenio_id?: string | null;
-  convenio_nome?: string | null;
-  convenios?: Convenio | null;
 }
 
 export interface TimeRange {
@@ -65,9 +57,9 @@ export interface TimeRange {
 }
 
 export interface DateRangeOptions {
-  startDate: Date | undefined;
-  endDate: Date | undefined;
-  selectedDays: number[]; // 0 = Sunday, 1 = Monday, etc.
+  startDate: Date;
+  endDate?: Date;
+  selectedDays: number[];
 }
 
 export interface WebhookConfiguration {
@@ -119,4 +111,12 @@ export interface ProfessionalService {
   id: string;
   professional_id: string;
   service_id: string;
+}
+
+export interface CompanySettings {
+  id: string;
+  name: string;
+  logo_url?: string;
+  primary_color?: string;
+  slug?: string;
 }

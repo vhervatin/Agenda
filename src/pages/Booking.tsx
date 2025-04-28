@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,15 +23,15 @@ import {
   fetchAvailableDates
 } from '@/services/api';
 import { Professional, Service, TimeSlot } from '@/types/types';
+import { format } from 'date-fns';
 
-const STEPS = ["Serviço", "Profissional", "Convênio", "Data", "Horário", "Dados", "Confirmação"];
+const STEPS = ["Serviço", "Profissional", "Data", "Horário", "Dados", "Confirmação"];
 
 const Booking = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
-  const [selectedConvenio, setSelectedConvenio] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
@@ -69,10 +68,10 @@ const Booking = () => {
     queryFn: fetchConvenios
   });
 
-  // Fetch available dates when professional and convênio are selected
+  // Fetch available dates when professional is selected
   useEffect(() => {
-    if (selectedProfessional && (selectedConvenio !== undefined)) {
-      fetchAvailableDates(selectedProfessional, selectedConvenio)
+    if (selectedProfessional) {
+      fetchAvailableDates(selectedProfessional, null)
         .then(dates => {
           setAvailableDates(dates);
           // If current selected date is not in available dates, reset it
@@ -85,12 +84,12 @@ const Booking = () => {
           toast.error("Não foi possível carregar as datas disponíveis");
         });
     }
-  }, [selectedProfessional, selectedConvenio]);
+  }, [selectedProfessional]);
   
   useEffect(() => {
     if (selectedProfessional && selectedDate) {
       const formattedDate = selectedDate.toISOString().split('T')[0];
-      fetchAvailableSlots(formattedDate, selectedProfessional, selectedConvenio)
+      fetchAvailableSlots(formattedDate, selectedProfessional, null)
         .then(slots => {
           setTimeSlots(slots);
           setSelectedTimeSlot(null);
@@ -100,31 +99,15 @@ const Booking = () => {
           toast.error("Não foi possível carregar os horários disponíveis");
         });
     }
-  }, [selectedProfessional, selectedDate, selectedConvenio]);
+  }, [selectedProfessional, selectedDate]);
 
   useEffect(() => {
     if (selectedService) {
       setSelectedProfessional(null);
-      setSelectedConvenio(null);
       setSelectedDate(null);
       setSelectedTimeSlot(null);
     }
   }, [selectedService]);
-  
-  useEffect(() => {
-    if (selectedProfessional) {
-      setSelectedConvenio(null);
-      setSelectedDate(null);
-      setSelectedTimeSlot(null);
-    }
-  }, [selectedProfessional]);
-
-  useEffect(() => {
-    if (selectedConvenio !== undefined) {
-      setSelectedDate(null);
-      setSelectedTimeSlot(null);
-    }
-  }, [selectedConvenio]);
   
   const selectedProfessionalObject = selectedProfessional 
     ? professionals.find(prof => prof.id === selectedProfessional) || null
@@ -138,10 +121,6 @@ const Booking = () => {
     ? timeSlots.find(slot => slot.id === selectedTimeSlot)
     : null;
 
-  const selectedConvenioObject = selectedConvenio
-    ? convenios.find(convenio => convenio.id === selectedConvenio) || null
-    : null;
-  
   const handleNextStep = () => {
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -209,7 +188,7 @@ const Booking = () => {
   }, [clientCpf]);
   
   const handleConfirmAppointment = () => {
-    if (!selectedProfessional || !selectedService || !selectedTimeSlot || !clientName || !clientPhone || !clientCpf) {
+    if (!selectedProfessional || !selectedService || !selectedTimeSlot || !clientName || !clientPhone || !clientCpf || !selectedDate) {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
@@ -226,6 +205,11 @@ const Booking = () => {
     
     setIsSubmitting(true);
     
+    // Ajustar a data para meio-dia UTC para evitar problemas de timezone
+    const appointmentDate = new Date(selectedDate);
+    appointmentDate.setUTCHours(12, 0, 0, 0);
+    const formattedDate = appointmentDate.toISOString();
+    
     const appointment = {
       professional_id: selectedProfessional,
       service_id: selectedService,
@@ -234,8 +218,7 @@ const Booking = () => {
       client_phone: clientPhone,
       client_cpf: clientCpf,
       status: 'confirmed' as const,
-      appointment_date: selectedTimeObject.start_time || new Date().toISOString(),
-      convenio_id: selectedConvenio
+      appointment_date: formattedDate
     };
     
     createAppointment(appointment)
@@ -255,10 +238,9 @@ const Booking = () => {
     switch (currentStep) {
       case 0: return !!selectedService;
       case 1: return !!selectedProfessional;
-      case 2: return true; // Convênio is optional
-      case 3: return !!selectedDate;
-      case 4: return !!selectedTimeSlot;
-      case 5: return !!clientName && !!clientPhone && !!clientCpf && clientCpf.replace(/\D/g, '').length === 11 && cpfIsValid;
+      case 2: return !!selectedDate;
+      case 3: return !!selectedTimeSlot;
+      case 4: return !!clientName && !!clientPhone && !!clientCpf && clientCpf.replace(/\D/g, '').length === 11 && cpfIsValid;
       default: return true;
     }
   };
@@ -349,46 +331,6 @@ const Booking = () => {
       case 2:
         return (
           <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold mb-4">Selecione seu convênio</h2>
-            
-            {isLoadingConvenios ? (
-              <div className="text-center py-8">Carregando convênios...</div>
-            ) : (
-              <div className="max-w-md mx-auto">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="convenio">Convênio (opcional)</Label>
-                    <Select
-                      value={selectedConvenio || 'none'}
-                      onValueChange={(value) => setSelectedConvenio(value === 'none' ? null : value)}
-                    >
-                      <SelectTrigger id="convenio" className="w-full">
-                        <SelectValue placeholder="Selecione seu convênio (opcional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sem convênio</SelectItem>
-                        {convenios.map((convenio) => (
-                          <SelectItem key={convenio.id} value={convenio.id}>
-                            {convenio.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="text-sm text-muted-foreground">
-                    {selectedConvenio 
-                      ? `Você selecionou o convênio: ${selectedConvenioObject?.nome}` 
-                      : "Selecionar um convênio é opcional. Se você não possui convênio, pode avançar para o próximo passo."}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      case 3:
-        return (
-          <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha uma data</h2>
             <div className="max-w-md mx-auto">
               {availableDates.length > 0 ? (
@@ -399,15 +341,15 @@ const Booking = () => {
                 />
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  {selectedProfessional && selectedConvenio !== undefined ? 
-                    "Nenhuma data disponível para este profissional e convênio." :
-                    "Selecione um profissional e convênio para ver as datas disponíveis."}
+                  {selectedProfessional ? 
+                    "Nenhuma data disponível para este profissional." :
+                    "Selecione um profissional para ver as datas disponíveis."}
                 </div>
               )}
             </div>
           </div>
         );
-      case 4:
+      case 3:
         return (
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold mb-4">Escolha um horário</h2>
@@ -418,7 +360,7 @@ const Booking = () => {
             />
           </div>
         );
-      case 5:
+      case 4:
         return (
           <ClientInfoForm
             clientName={clientName}
@@ -429,7 +371,7 @@ const Booking = () => {
             onClientCpfChange={setClientCpf}
           />
         );
-      case 6:
+      case 5:
         return (
           <div className="max-w-md mx-auto">
             <AppointmentSummary
@@ -449,7 +391,6 @@ const Booking = () => {
               onConfirm={handleConfirmAppointment}
               onEdit={() => setCurrentStep(0)}
               isSubmitting={isSubmitting}
-              convenio={selectedConvenioObject?.nome}
             />
           </div>
         );

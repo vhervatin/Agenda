@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -81,8 +80,21 @@ const AppointmentSuccess = () => {
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     
-    const date = new Date(dateString);
-    return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    try {
+      // Garantir que a data está no formato correto antes de criar o objeto Date
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month - 1 porque os meses em JS são 0-based
+      
+      if (isNaN(date.getTime())) {
+        console.error('Data inválida:', dateString);
+        return '';
+      }
+      
+      return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return '';
+    }
   };
   
   const formatTime = (timeString: string) => {
@@ -165,7 +177,7 @@ const AppointmentSuccess = () => {
               <h3 className="font-semibold text-lg mb-2">Data e horário</h3>
               <p>{formatDate(appointment.appointment_date)}</p>
               <p className="font-medium">
-                {appointment.slots?.start_time && formatTime(appointment.slots.start_time)}
+                {appointment.slots?.start_time ? formatTime(appointment.slots.start_time) : ''}
               </p>
             </div>
             

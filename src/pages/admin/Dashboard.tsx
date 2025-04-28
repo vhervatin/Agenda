@@ -66,14 +66,14 @@ const Dashboard = () => {
     data: appointments = [], 
     isLoading: isLoadingAppointments 
   } = useQuery({
-    queryKey: ['appointments', { status: 'confirmed' }],
-    queryFn: fetchAppointments
+    queryKey: ['appointments'],
+    queryFn: () => fetchAppointments()
   });
   
   // Count today's appointments
   const todayAppointments = appointments.filter(appointment => {
-    if (!appointment.slots?.start_time) return false;
-    return isToday(new Date(appointment.slots.start_time));
+    if (!appointment.appointment_date) return false;
+    return isToday(new Date(appointment.appointment_date));
   });
   
   // Count appointments by status

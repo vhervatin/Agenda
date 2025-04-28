@@ -91,11 +91,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       text: 'Agendamentos'
     },
     {
-      href: '/admin/convenios',
-      icon: <FileHeart className="h-5 w-5" />,
-      text: 'Convênios'
-    },
-    {
       href: '/admin/integrations',
       icon: <Webhook className="h-5 w-5" />,
       text: 'Integrações'
@@ -117,7 +112,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           className="flex items-center font-semibold"
           onClick={() => setOpen(false)}
         >
-          Admin Dashboard
+          Administrador
         </Link>
       </div>
       <div className="flex-1 overflow-auto py-2">

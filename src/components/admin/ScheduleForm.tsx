@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { fetchProfessionals, fetchConvenios } from '@/services/api';
+import { fetchProfessionals } from '@/services/api';
 import { TimeRange, DateRangeOptions } from '@/types/types';
 
 interface ScheduleFormProps {
@@ -14,7 +13,6 @@ interface ScheduleFormProps {
   onDateRangeChange: (dateRange: Date[]) => void;
   onProfessionalChange: (professionalId: string) => void;
   onSlotDurationChange: (duration: number) => void;
-  onConvenioChange?: (convenioId: string | null) => void;
   onSubmit: () => void;
   isLoading: boolean;
   onClose: () => void;
@@ -25,7 +23,6 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
   onDateRangeChange,
   onProfessionalChange,
   onSlotDurationChange,
-  onConvenioChange,
   onSubmit,
   isLoading,
   onClose
@@ -38,7 +35,6 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
   });
   
   const [selectedProfessional, setSelectedProfessional] = useState<string>('');
-  const [selectedConvenio, setSelectedConvenio] = useState<string | null>(null);
   const [slotDuration, setSlotDuration] = useState<number>(30);
   const [dateRangeOption, setDateRangeOption] = useState<DateRangeOptions>({
     startDate: new Date(),
@@ -49,11 +45,6 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
   const { data: professionals = [] } = useQuery({
     queryKey: ['professionals'],
     queryFn: () => fetchProfessionals()
-  });
-
-  const { data: convenios = [] } = useQuery({
-    queryKey: ['convenios'],
-    queryFn: () => fetchConvenios()
   });
   
   const handleTimeRangeChange = (field: keyof TimeRange, value: string) => {
@@ -66,81 +57,27 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
     setSelectedProfessional(value);
     onProfessionalChange(value);
   };
-
-  const handleConvenioChange = (value: string) => {
-    const newValue = value === 'none' ? null : value;
-    setSelectedConvenio(newValue);
-    if (onConvenioChange) {
-      onConvenioChange(newValue);
-    }
-  };
   
   const handleSlotDurationChange = (value: number) => {
     setSlotDuration(value);
     onSlotDurationChange(value);
   };
   
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) return;
-    
-    const newDateRange = { ...dateRangeOption };
-    
-    if (!newDateRange.startDate || (newDateRange.startDate && newDateRange.endDate)) {
-      // Start a new selection
-      newDateRange.startDate = date;
-      newDateRange.endDate = undefined;
-    } else {
-      // Complete the selection
-      if (date < newDateRange.startDate) {
-        newDateRange.endDate = newDateRange.startDate;
-        newDateRange.startDate = date;
-      } else {
-        newDateRange.endDate = date;
-      }
+  const handleDateSelect = (date: Date) => {
+    const newDateRange = [date];
+    if (dateRangeOption.endDate) {
+      newDateRange.push(dateRangeOption.endDate);
     }
-    
-    setDateRangeOption(newDateRange);
-    updateSelectedDates(newDateRange);
+    onDateRangeChange(newDateRange);
+    setDateRangeOption(prev => ({ ...prev, startDate: date }));
   };
   
   const handleDaySelect = (day: number) => {
-    const newSelectedDays = [...dateRangeOption.selectedDays];
+    const newSelectedDays = dateRangeOption.selectedDays.includes(day)
+      ? dateRangeOption.selectedDays.filter(d => d !== day)
+      : [...dateRangeOption.selectedDays, day];
     
-    if (newSelectedDays.includes(day)) {
-      // Remove day if already selected
-      const index = newSelectedDays.indexOf(day);
-      newSelectedDays.splice(index, 1);
-    } else {
-      // Add day if not selected
-      newSelectedDays.push(day);
-    }
-    
-    const newDateRange = { ...dateRangeOption, selectedDays: newSelectedDays };
-    setDateRangeOption(newDateRange);
-    updateSelectedDates(newDateRange);
-  };
-  
-  const updateSelectedDates = (options: DateRangeOptions) => {
-    if (!options.startDate || !options.endDate) {
-      // If we don't have a complete range, just return the start date if it exists
-      onDateRangeChange(options.startDate ? [options.startDate] : []);
-      return;
-    }
-    
-    const dates: Date[] = [];
-    let currentDate = new Date(options.startDate);
-    
-    while (currentDate <= options.endDate) {
-      const dayOfWeek = currentDate.getDay();
-      
-      if (options.selectedDays.includes(dayOfWeek)) {
-        dates.push(new Date(currentDate));
-      }
-      
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-    
-    onDateRangeChange(dates);
+    setDateRangeOption(prev => ({ ...prev, selectedDays: newSelectedDays }));
   };
   
   const getDayName = (day: number): string => {
@@ -169,26 +106,6 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({
               {professionals.map((professional) => (
                 <SelectItem key={professional.id} value={professional.id}>
                   {professional.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="convenio">Convênio (opcional)</Label>
-          <Select
-            value={selectedConvenio || 'none'}
-            onValueChange={handleConvenioChange}
-          >
-            <SelectTrigger id="convenio">
-              <SelectValue placeholder="Selecione um convênio (opcional)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sem convênio</SelectItem>
-              {convenios.map((convenio) => (
-                <SelectItem key={convenio.id} value={convenio.id}>
-                  {convenio.nome}
                 </SelectItem>
               ))}
             </SelectContent>
