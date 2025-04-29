@@ -12,7 +12,7 @@ const SUPABASE_KEY = "eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // Create a single supabase client for the entire app
 export const supabase = createClient<Database>(
   SUPABASE_URL, 
-  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_KEY,
   {
     auth: {
       persistSession: true,
