@@ -15,6 +15,7 @@ export interface Professional {
   bio?: string;
   phone?: string; // Added phone field to match admin interface
   active: boolean;
+  mail: string;
   professionals?: Professional; // For nested professional objects from the API
 }
 

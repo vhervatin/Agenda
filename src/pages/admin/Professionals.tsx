@@ -26,6 +26,7 @@ const Professionals = () => {
   // Form state
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
+  const [email, setMail] = useState('');
   const [phone, setPhone] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   
@@ -80,6 +81,7 @@ const Professionals = () => {
   const resetForm = () => {
     setName('');
     setBio('');
+    setMail('');
     setPhone('');
     setPhotoUrl('');
     setSelectedProfessional(null);
@@ -94,6 +96,7 @@ const Professionals = () => {
     createMutation.mutate({
       name,
       bio,
+      email,
       photo_url: photoUrl,
       phone, // This now matches our updated type
       active: true
@@ -111,6 +114,7 @@ const Professionals = () => {
       data: {
         name,
         bio,
+        email,
         photo_url: photoUrl,
         phone // This now matches our updated type
       }
@@ -128,6 +132,7 @@ const Professionals = () => {
     setName(professional.name);
     setBio(professional.bio || '');
     setPhone(professional.phone || '');
+    setMail(professional.email || '');
     setPhotoUrl(professional.photo_url || '');
     setIsEditDialogOpen(true);
   };
@@ -172,6 +177,16 @@ const Professionals = () => {
                     value={phone} 
                     onChange={(e) => setPhone(e.target.value)} 
                     placeholder="(00) 00000-0000" 
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="mail">E-mail</Label>
+                  <Input 
+                    id="mail" 
+                    value={email} 
+                    onChange={(e) => setMail(e.target.value)} 
+                    placeholder="xxxx@xxxxx.com" 
                   />
                 </div>
                 
@@ -231,6 +246,7 @@ const Professionals = () => {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Telefone</TableHead>
+                    <TableHead>E-mail</TableHead>
                     <TableHead>Biografia</TableHead>
                     <TableHead className="w-[100px]">Ações</TableHead>
                   </TableRow>
@@ -240,6 +256,7 @@ const Professionals = () => {
                     <TableRow key={professional.id}>
                       <TableCell className="font-medium">{professional.name}</TableCell>
                       <TableCell>{professional.phone || '-'}</TableCell>
+                      <TableCell>{professional.email || '-'}</TableCell>
                       <TableCell className="max-w-md truncate">
                         {professional.bio || '-'}
                       </TableCell>
@@ -295,6 +312,16 @@ const Professionals = () => {
                 value={phone} 
                 onChange={(e) => setPhone(e.target.value)} 
                 placeholder="(00) 00000-0000" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-mail">E-mail</Label>
+              <Input 
+                id="edit-mail" 
+                value={email} 
+                onChange={(e) => setMail(e.target.value)} 
+                placeholder="xxxx@xxxxx.com" 
               />
             </div>
             
